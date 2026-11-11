@@ -1,0 +1,44 @@
+
+.disasters-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  margin-top: 20px;
+}
+
+.disasters-table th,
+.disasters-table td {
+  padding: 14px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.disasters-table th {
+  background: #e9edf3;
+}
+
+.disasters-header {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+.disaster-filters {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.disaster-filters input,
+.disaster-filters select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.disaster-filters input {
+  flex: 1;
+  min-width: 200px;
+}

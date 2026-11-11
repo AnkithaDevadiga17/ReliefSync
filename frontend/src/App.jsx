@@ -1,10 +1,13 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home/Home";
+import Disasters from "./pages/Disasters/Disasters";
 
 import "./App.css";
 
+// Temporary placeholder for modules we haven't developed yet
 function Placeholder({ title }) {
   return (
     <div>
@@ -15,31 +18,34 @@ function Placeholder({ title }) {
 }
 
 function App() {
-
   return (
-
     <BrowserRouter>
-
       <div className="app-layout">
 
+        {/* Navigation sidebar */}
         <Sidebar />
 
+        {/* Main page content */}
         <main className="main-content">
 
           <Routes>
 
+            {/* Home page */}
             <Route path="/" element={<Home />} />
 
+            {/* Dashboard */}
             <Route
               path="/dashboard"
               element={<Placeholder title="Dashboard" />}
             />
 
+            {/* Disaster Management */}
             <Route
               path="/disasters"
-              element={<Placeholder title="Disaster Management" />}
+              element={<Disasters />}
             />
 
+            {/* Other modules */}
             <Route
               path="/shelters"
               element={<Placeholder title="Shelter Management" />}
@@ -73,11 +79,8 @@ function App() {
           </Routes>
 
         </main>
-
       </div>
-
     </BrowserRouter>
-
   );
 }
 

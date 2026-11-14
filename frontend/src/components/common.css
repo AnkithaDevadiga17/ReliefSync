@@ -1,0 +1,86 @@
+/* Shared styles for reusable ReliefSync components */
+
+/* Statistics card */
+.stat-card {
+  background: #fff;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.stat-card h3 {
+  margin: 0 0 12px;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.stat-value {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pending,
+.status-full {
+  background: #fff0cc;
+  color: #8a5a00;
+}
+
+.status-verified,
+.status-open,
+.status-resolved,
+.status-available,
+.status-active,
+.status-distributed {
+  background: #d9f5df;
+  color: #176b2c;
+}
+
+.status-closed,
+.status-rejected,
+.status-critical,
+.status-inactive,
+.status-unavailable {
+  background: #f8dada;
+  color: #9b2222;
+}
+
+/* Search field */
+.search-bar {
+  box-sizing: border-box;
+  width: 280px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font: inherit;
+}
+
+/* Reusable data table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.data-table th,
+.data-table td {
+  padding: 13px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.data-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+}

@@ -1,66 +1,197 @@
+
+import { Link } from "react-router-dom";
+import "./Home.css";
+
 function Home() {
+  const features = [
+    {
+      icon: "🌪️",
+      title: "Disaster Management",
+      description:
+        "Monitor disaster reports, track incidents and coordinate emergency response."
+    },
+    {
+      icon: "🏠",
+      title: "Shelter Management",
+      description:
+        "Manage shelters, monitor available capacity and organize accommodation."
+    },
+    {
+      icon: "📦",
+      title: "Resource Management",
+      description:
+        "Track essential supplies and coordinate the distribution of resources."
+    },
+    {
+      icon: "🤝",
+      title: "Volunteer Coordination",
+      description:
+        "Organize volunteers and coordinate their participation in relief activities."
+    },
+    {
+      icon: "❤️",
+      title: "Donation Management",
+      description:
+        "Manage donations and support transparent allocation of relief assistance."
+    },
+    {
+      icon: "📊",
+      title: "Analytics & Forecasting",
+      description:
+        "Explore response information and understand resource and disaster trends."
+    }
+  ];
+
+  const steps = [
+    {
+      number: "01",
+      title: "Report",
+      description: "Record disaster incidents and identify affected areas."
+    },
+    {
+      number: "02",
+      title: "Coordinate",
+      description: "Connect shelters, volunteers and available resources."
+    },
+    {
+      number: "03",
+      title: "Allocate",
+      description: "Organize and distribute resources according to requirements."
+    },
+    {
+      number: "04",
+      title: "Respond",
+      description: "Support coordinated relief and recovery activities."
+    }
+  ];
 
   return (
-    <div>
+    <div className="home-page">
 
-      <h1>Welcome to ReliefSync</h1>
+      {/* Hero Section */}
+      <section className="home-hero">
+        <div className="home-hero-content">
+          <span className="home-eyebrow">
+            INTELLIGENT DISASTER RESPONSE PLATFORM
+          </span>
 
-      <p>
-        Intelligent Disaster Resource Allocation and Coordination Platform
-      </p>
+          <h1>
+            Coordinating Relief.
+            <br />
+            <span>Restoring Hope.</span>
+          </h1>
 
-      <hr />
+          <p>
+            ReliefSync is an intelligent disaster resource allocation and
+            coordination platform designed to bring disaster information,
+            shelters, resources, volunteers and donations together in one
+            organized system.
+          </p>
 
-      <h2>Overview</h2>
+          <div className="home-hero-actions">
+            <Link to="/dashboard" className="home-primary-button">
+              Explore Dashboard →
+            </Link>
 
-      <p>Monitor and coordinate disaster response operations.</p>
-
-      <br />
-
-      <div className="stats">
-
-        <div>
-          <h3>Active Disasters</h3>
-          <h2>05</h2>
+            <a href="#about" className="home-secondary-button">
+              Learn More
+            </a>
+          </div>
         </div>
 
-        <div>
-          <h3>Affected Areas</h3>
-          <h2>12</h2>
+        <div className="home-hero-visual">
+          <div className="home-visual-icon">🌍</div>
+          <div className="home-visual-circle circle-one"></div>
+          <div className="home-visual-circle circle-two"></div>
+
+          <div className="home-visual-caption">
+            <strong>One Platform</strong>
+            <span>Multiple Relief Operations</span>
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section className="home-about" id="about">
+        <div className="home-section-heading">
+          <span>ABOUT RELIEFSYNC</span>
+          <h2>Bringing disaster response together</h2>
         </div>
 
-        <div>
-          <h3>Operational Shelters</h3>
-          <h2>08</h2>
+        <p>
+          During disasters, coordinating information and resources across
+          different teams can be challenging. ReliefSync aims to simplify
+          this process through a centralized platform where administrators
+          can manage disaster reports, shelters, resources, volunteers and
+          donations.
+        </p>
+
+        <p>
+          By organizing these operations in one place, the platform supports
+          better visibility, coordination and resource allocation during
+          disaster response activities.
+        </p>
+      </section>
+
+      {/* Features Section */}
+      <section className="home-features">
+        <div className="home-section-heading">
+          <span>OUR MODULES</span>
+          <h2>Everything connected in one platform</h2>
+          <p>
+            Dedicated modules to organize different aspects of disaster
+            response and relief coordination.
+          </p>
         </div>
 
-        <div>
-          <h3>Critical Alerts</h3>
-          <h2>03</h2>
+        <div className="home-feature-grid">
+          {features.map((feature) => (
+            <div className="home-feature-card" key={feature.title}>
+              <div className="home-feature-icon">{feature.icon}</div>
+              <h3>{feature.title}</h3>
+              <p>{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Workflow Section */}
+      <section className="home-workflow">
+        <div className="home-section-heading">
+          <span>HOW IT WORKS</span>
+          <h2>A coordinated approach to relief</h2>
         </div>
 
-      </div>
+        <div className="home-workflow-grid">
+          {steps.map((step) => (
+            <div className="home-workflow-card" key={step.number}>
+              <span>{step.number}</span>
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <br />
+      {/* Call to Action */}
+      <section className="home-cta">
+        <h2>Explore the ReliefSync platform</h2>
+        <p>
+          Access the dashboard to view operational summaries and explore
+          the different disaster management modules.
+        </p>
 
-      <h2>Quick Access</h2>
+        <Link to="/dashboard" className="home-primary-button">
+          Go to Dashboard →
+        </Link>
+      </section>
 
-      <ul>
-        <li>View Disaster Reports</li>
-        <li>Manage Shelters</li>
-        <li>Check Resource Availability</li>
-        <li>Coordinate Volunteers</li>
-      </ul>
-
-      <br />
-
-      <h2>Disaster Monitoring</h2>
-
-      <div className="map-placeholder">
-        Map integration will be added later.
-      </div>
-
-      <small>All displayed figures are illustrative sample data.</small>
+      {/* Footer */}
+      <footer className="home-footer">
+        <h3>ReliefSync</h3>
+        <p>Intelligent Disaster Resource Allocation and Coordination Platform</p>
+        <span>Academic Project | MCA</span>
+      </footer>
 
     </div>
   );

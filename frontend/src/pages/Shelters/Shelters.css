@@ -1,0 +1,49 @@
+﻿.shelter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.shelter-edit-button,
+.shelter-delete-button,
+.shelter-cancel-button {
+  border: 1px solid #cfd6df;
+  border-radius: 5px;
+  padding: 7px 11px;
+  cursor: pointer;
+  background: white;
+  font: inherit;
+  font-size: 13px;
+}
+
+.shelter-edit-button {
+  color: #2457a7;
+}
+
+.shelter-delete-button {
+  color: #b42318;
+}
+
+.shelter-cancel-button {
+  color: #4f5b6b;
+}
+
+.shelter-form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.shelter-notice {
+  color: #216b3a;
+  background: #e1f4e7;
+  padding: 10px 13px;
+  border-radius: 6px;
+}
+
+.shelter-error {
+  color: #963535;
+  background: #fbe5e5;
+  padding: 10px 13px;
+  border-radius: 6px;
+}

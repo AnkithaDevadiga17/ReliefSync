@@ -1,0 +1,89 @@
+
+.donation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.donation-edit-button,
+.donation-verify-button,
+.donation-delete-button,
+.donation-distribute-button,
+.donation-cancel-button {
+  padding: 7px 10px;
+  border: 1px solid #cfd6df;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.donation-edit-button {
+  color: #2457a7;
+}
+
+.donation-verify-button {
+  color: #216b3a;
+}
+
+.donation-delete-button {
+  color: #b42318;
+}
+
+.donation-distribute-button {
+  color: #146b75;
+}
+
+.donation-cancel-button {
+  color: #4f5b6b;
+}
+
+.donation-form {
+  margin-top: 15px;
+}
+
+.donation-form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.donation-distribution-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+
+.donation-distribution-heading p {
+  margin: 0;
+  color: #667085;
+}
+
+.donation-notice {
+  padding: 10px 13px;
+  border-radius: 6px;
+  background: #e1f4e7;
+  color: #216b3a;
+}
+
+.donation-error {
+  padding: 10px 13px;
+  border-radius: 6px;
+  background: #fbe5e5;
+  color: #963535;
+}
+
+.donation-actions button:hover,
+.donation-cancel-button:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 650px) {
+  .donation-distribution-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

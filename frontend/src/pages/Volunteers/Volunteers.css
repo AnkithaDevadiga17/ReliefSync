@@ -1,0 +1,84 @@
+
+.volunteer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.volunteer-edit-button,
+.volunteer-delete-button,
+.volunteer-complete-button,
+.volunteer-cancel-button {
+  padding: 7px 11px;
+  border: 1px solid #cfd6df;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.volunteer-edit-button {
+  color: #2457a7;
+}
+
+.volunteer-delete-button {
+  color: #b42318;
+}
+
+.volunteer-complete-button {
+  color: #216b3a;
+}
+
+.volunteer-cancel-button {
+  color: #4f5b6b;
+}
+
+.volunteer-form {
+  margin-top: 15px;
+}
+
+.volunteer-form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.volunteer-assignment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+
+.volunteer-assignment-heading p {
+  margin: 0;
+  color: #667085;
+}
+
+.volunteer-notice {
+  padding: 10px 13px;
+  border-radius: 6px;
+  background: #e1f4e7;
+  color: #216b3a;
+}
+
+.volunteer-error {
+  padding: 10px 13px;
+  border-radius: 6px;
+  background: #fbe5e5;
+  color: #963535;
+}
+
+.volunteer-actions button:hover,
+.volunteer-cancel-button:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 650px) {
+  .volunteer-assignment-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

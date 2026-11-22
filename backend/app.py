@@ -1,5 +1,7 @@
 ﻿
 from decimal import Decimal
+import os
+from datetime import timedelta
 
 from flask import Flask, jsonify
 from flask.json.provider import DefaultJSONProvider
@@ -14,7 +16,8 @@ from routes.allocation_routes import allocation_bp
 from routes.volunteer_routes import volunteer_bp
 from routes.donation_routes import donation_bp
 from routes.analytics_routes import analytics_bp
-
+from routes.auth_routes import auth_bp
+from routes.user_routes import user_bp
 
 # Convert MySQL DECIMAL values into JSON numbers
 class ReliefJSONProvider(DefaultJSONProvider):
@@ -30,9 +33,23 @@ class ReliefJSONProvider(DefaultJSONProvider):
 app = Flask(__name__)
 app.json = ReliefJSONProvider(app)
 
-CORS(app, resources={
-    r"/api/*": {"origins": "http://localhost:5173"}
-})
+# Session configuration
+app.secret_key = os.getenv("SECRET_KEY", "reliefsync-dev-secret-change-before-deployment")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=False,  # Set True when using HTTPS in production
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7)
+)
+
+# CORS configuration
+CORS(
+    app,
+    resources={
+        r"/api/*": {"origins": "http://localhost:5173"}
+    },
+    supports_credentials=True
+)
 
 
 # REGISTER ALL MODULES
@@ -43,8 +60,8 @@ app.register_blueprint(allocation_bp, url_prefix="/api")
 app.register_blueprint(volunteer_bp, url_prefix="/api")
 app.register_blueprint(donation_bp, url_prefix="/api")
 app.register_blueprint(analytics_bp, url_prefix="/api")
-
-
+app.register_blueprint(auth_bp, url_prefix="/api")
+app.register_blueprint(user_bp, url_prefix="/api")
 # HOME
 @app.route("/", methods=["GET"])
 def home():

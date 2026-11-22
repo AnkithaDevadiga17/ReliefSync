@@ -13,6 +13,7 @@ import {
 
 import "../../styles/Modules.css";
 import "./Donations.css";
+import { apiFetch } from "../../services/api";
 
 const API = "http://127.0.0.1:5000/api";
 
@@ -104,7 +105,7 @@ function Donations() {
       ];
 
       const responses = await Promise.all(
-        endpoints.map(endpoint => fetch(`${API}${endpoint}`))
+        endpoints.map(endpoint => apiFetch(`${API}${endpoint}`))
       );
 
       const results = await Promise.all(
@@ -232,7 +233,7 @@ function Donations() {
           : null
       };
 
-      const response = await fetch(
+      const response = await apiFetch(
         isEditing
           ? `${API}/donations/${editingId}`
           : `${API}/donations`,
@@ -289,7 +290,7 @@ function Donations() {
       setError("");
       setNotice("");
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API}/donations/${donation.donation_id}/status`,
         {
           method: "PUT",
@@ -336,7 +337,7 @@ function Donations() {
       setError("");
       setNotice("");
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API}/donations/${id}`,
         { method: "DELETE" }
       );
@@ -441,7 +442,7 @@ function Donations() {
           : Number(distributionForm.quantity_allocated)
       };
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API}/donation-distributions`,
         {
           method: "POST",

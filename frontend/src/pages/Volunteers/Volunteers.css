@@ -1,48 +1,204 @@
-
-.volunteer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+.volunteers-page {
+  width: 100%;
 }
 
-.volunteer-edit-button,
-.volunteer-delete-button,
-.volunteer-complete-button,
-.volunteer-cancel-button {
-  padding: 7px 11px;
-  border: 1px solid #cfd6df;
-  border-radius: 5px;
-  background: white;
-  cursor: pointer;
+
+/* SUCCESS AND ERROR MESSAGES */
+
+.volunteer-notice,
+.volunteer-error {
+  padding: 12px 15px;
+  margin: 0 0 16px;
+  border-radius: 7px;
   font-size: 13px;
 }
 
-.volunteer-edit-button {
-  color: #2457a7;
-}
-
-.volunteer-delete-button {
-  color: #b42318;
-}
-
-.volunteer-complete-button {
+.volunteer-notice {
   color: #216b3a;
+  background: #e5f6e9;
+  border: 1px solid #bce5c7;
 }
 
-.volunteer-cancel-button {
-  color: #4f5b6b;
+.volunteer-error {
+  color: #963535;
+  background: #fbe5e5;
+  border: 1px solid #f0c5c5;
 }
+
+
+/* LOCATION SELECTOR */
+
+.volunteer-location-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.volunteer-location-filter label {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.volunteer-location-filter select {
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 13px;
+}
+
+.volunteer-location-filter select:focus {
+  outline: none;
+  border-color: #2457a7;
+  box-shadow: 0 0 0 2px rgba(36, 87, 167, 0.12);
+}
+
+.volunteer-location-filter p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+
+/* CURRENT LOCATION */
+
+.volunteer-current-location {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 17px;
+  margin: 20px 0 15px;
+  border-left: 4px solid #2457a7;
+  background: #f7f9fc;
+}
+
+.volunteer-current-location span {
+  color: #667085;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.volunteer-current-location strong {
+  color: #172b4d;
+  font-size: 17px;
+}
+
+.volunteer-current-location small {
+  color: #667085;
+  font-size: 12px;
+}
+
+
+/* LOCATION OVERVIEW */
+
+.volunteer-section-description {
+  margin: -5px 0 15px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* FORMS */
 
 .volunteer-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 17px;
   margin-top: 15px;
 }
 
+.volunteer-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.volunteer-form input,
+.volunteer-form select,
+.volunteer-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 13px;
+}
+
+.volunteer-form textarea {
+  resize: vertical;
+}
+
+.volunteer-form input:focus,
+.volunteer-form select:focus,
+.volunteer-form textarea:focus {
+  outline: none;
+  border-color: #2457a7;
+  box-shadow: 0 0 0 2px rgba(36, 87, 167, 0.12);
+}
+
+.volunteer-form input:disabled,
+.volunteer-form select:disabled {
+  background: #f2f4f7;
+  cursor: not-allowed;
+}
+
+.volunteer-full-width {
+  grid-column: 1 / -1;
+}
+
+.volunteer-hint {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+
+/* FORM BUTTONS */
+
 .volunteer-form-actions {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
   align-items: center;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 6px;
 }
+
+.volunteer-cancel-button {
+  padding: 10px 15px;
+  border: 1px solid #cfd6df;
+  border-radius: 6px;
+  background: #fff;
+  color: #4f5b6b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.volunteer-cancel-button:hover {
+  background: #f3f5f7;
+}
+
+.volunteer-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ASSIGNMENT SECTION HEADING */
 
 .volunteer-assignment-heading {
   display: flex;
@@ -52,33 +208,132 @@
   margin-bottom: 18px;
 }
 
+.volunteer-assignment-heading h3 {
+  margin: 0 0 5px;
+  color: #172b4d;
+  font-size: 15px;
+}
+
 .volunteer-assignment-heading p {
   margin: 0;
   color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.volunteer-notice {
-  padding: 10px 13px;
-  border-radius: 6px;
-  background: #e1f4e7;
+
+/* TABLE ACTIONS */
+
+.volunteer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-width: 110px;
+}
+
+.volunteer-edit-button,
+.volunteer-delete-button,
+.volunteer-complete-button {
+  padding: 7px 11px;
+  border: 1px solid #cfd6df;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.volunteer-edit-button {
+  color: #2457a7;
+  background: #e7effb;
+  border-color: #d4e3f8;
+}
+
+.volunteer-edit-button:hover {
+  background: #d4e3f8;
+}
+
+.volunteer-delete-button {
+  color: #b42318;
+  background: #fdeaea;
+  border-color: #f5d0d0;
+}
+
+.volunteer-delete-button:hover {
+  background: #f8d5d5;
+}
+
+.volunteer-complete-button {
   color: #216b3a;
+  background: #e5f6e9;
+  border-color: #bce5c7;
 }
 
-.volunteer-error {
-  padding: 10px 13px;
-  border-radius: 6px;
-  background: #fbe5e5;
-  color: #963535;
+.volunteer-complete-button:hover {
+  background: #d4efdc;
 }
 
-.volunteer-actions button:hover,
-.volunteer-cancel-button:hover {
-  opacity: 0.8;
+.volunteer-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-@media (max-width: 650px) {
+.volunteer-muted {
+  color: #98a2b3;
+  font-size: 11px;
+}
+
+
+/* EMPTY LOCATION STATE */
+
+.volunteer-empty {
+  padding: 20px;
+  margin: 18px 0;
+  border: 1px solid #d8e4f5;
+  border-radius: 8px;
+  background: #f7faff;
+}
+
+.volunteer-empty h3 {
+  margin: 0 0 8px;
+  color: #2457a7;
+  font-size: 15px;
+}
+
+.volunteer-empty p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 700px) {
+
+  .volunteer-form {
+    grid-template-columns: 1fr;
+  }
+
+  .volunteer-full-width {
+    grid-column: auto;
+  }
+
+  .volunteer-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .volunteer-form-actions button {
+    width: 100%;
+  }
+
   .volunteer-assignment-heading {
     align-items: flex-start;
     flex-direction: column;
   }
+
 }

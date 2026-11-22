@@ -1,5 +1,5 @@
+import { useEffect, useMemo, useState } from "react";
 
-import { useState, useEffect } from "react";
 import {
   DataTable,
   PageHeader,
@@ -10,10 +10,12 @@ import {
   StatusBadge
 } from "../../components/ModuleUI";
 
+import { apiRequest } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+
 import "../../styles/Modules.css";
 import "./Shelters.css";
 
-const API_URL = "http://127.0.0.1:5000/api";
 
 const emptyForm = {
   location_id: "",
@@ -26,62 +28,140 @@ const emptyForm = {
   status: "operational"
 };
 
+
+function formatNumber(value) {
+
+  return Number(value || 0).toLocaleString("en-IN");
+
+}
+
+
 function Shelters() {
 
+  const { user } = useAuth();
+
+  const role = user?.role?.toLowerCase();
+
+  const isAdmin = role === "admin";
+
+  const isCoordinator = role === "coordinator";
+
+  const isVolunteer = role === "volunteer";
+
+  const canManage = [
+    "admin",
+    "coordinator",
+    "ngo"
+  ].includes(role);
+
+
+  // ----------------------------------------
+  // DATA
+  // ----------------------------------------
+
   const [shelters, setShelters] = useState([]);
+
   const [locations, setLocations] = useState([]);
 
+  const [locationSummary, setLocationSummary] = useState([]);
+
+  const [assignedLocation, setAssignedLocation] = useState(null);
+
+
+  // ----------------------------------------
+  // FILTERS
+  // ----------------------------------------
+
+  // Admin/NGO initially see all.
+  // Coordinator must select their monitoring location.
+  // Volunteer is automatically assigned by the backend.
+  const [selectedLocationId, setSelectedLocationId] =
+    useState(isCoordinator ? "" : "All");
+
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("All");
+
+  const [statusFilter, setStatusFilter] = useState("All");
+
+
+  // ----------------------------------------
+  // FORM AND REQUEST STATE
+  // ----------------------------------------
 
   const [loading, setLoading] = useState(true);
+
   const [saving, setSaving] = useState(false);
 
+  const [deletingId, setDeletingId] = useState(null);
+
   const [error, setError] = useState("");
+
   const [notice, setNotice] = useState("");
 
   const [showForm, setShowForm] = useState(false);
+
   const [editingId, setEditingId] = useState(null);
+
   const [formData, setFormData] = useState(emptyForm);
 
 
-  // LOAD SHELTERS AND LOCATIONS
+  // ----------------------------------------
+  // LOAD DATA
+  // ----------------------------------------
+
   const loadData = async () => {
 
     try {
 
       setLoading(true);
+
       setError("");
 
-      const [shelterResponse, locationResponse] =
-        await Promise.all([
-          fetch(`${API_URL}/shelters`),
-          fetch(`${API_URL}/locations`)
-        ]);
+      const shelterResponse = await apiRequest("/shelters");
 
-      const shelterResult = await shelterResponse.json();
-      const locationResult = await locationResponse.json();
+      setShelters(shelterResponse.data || []);
 
-      if (!shelterResponse.ok || !shelterResult.success) {
-        throw new Error(shelterResult.message || "Unable to load shelters.");
+      setLocationSummary(
+        shelterResponse.location_summary || []
+      );
+
+      const scope = shelterResponse.scope || {};
+
+      setAssignedLocation(scope.assigned_location || null);
+
+
+      if (isVolunteer) {
+
+        // The server already restricts this volunteer's shelter data.
+        setSelectedLocationId(
+          scope.assigned_location_id
+            ? String(scope.assigned_location_id)
+            : ""
+        );
+
+        // Do not fetch the global location list for volunteers.
+        setLocations([]);
+
+      } else {
+
+        // Managers use the shared Location Management API.
+        const locationResponse = await apiRequest("/locations");
+
+        setLocations(locationResponse.data || []);
+
       }
-
-      if (!locationResponse.ok || !locationResult.success) {
-        throw new Error(locationResult.message || "Unable to load locations.");
-      }
-
-      setShelters(shelterResult.data || []);
-      setLocations(locationResult.data || []);
 
     } catch (err) {
 
-      setError(err.message);
+      setError(
+        err.message || "Unable to load shelter information."
+      );
 
     } finally {
 
       setLoading(false);
 
     }
+
   };
 
 
@@ -90,7 +170,214 @@ function Shelters() {
   }, []);
 
 
-  // HANDLE FORM INPUTS
+  // ----------------------------------------
+  // SELECTED LOCATION
+  // ----------------------------------------
+
+  const selectedLocation = useMemo(() => {
+
+    if (isVolunteer) {
+      return assignedLocation;
+    }
+
+    return locations.find(
+      location =>
+        String(location.location_id) === selectedLocationId
+    ) || null;
+
+  }, [
+    isVolunteer,
+    assignedLocation,
+    locations,
+    selectedLocationId
+  ]);
+
+
+  const locationSelected =
+    isAdmin ||
+    !isCoordinator && selectedLocationId === "All" ||
+    Boolean(selectedLocationId);
+
+
+  // ----------------------------------------
+  // LOCATION-WISE SHELTER FILTER
+  // ----------------------------------------
+
+  const locationShelters = useMemo(() => {
+
+    if (!selectedLocationId || selectedLocationId === "All") {
+
+      return shelters;
+
+    }
+
+    return shelters.filter(
+      shelter =>
+        String(shelter.location_id) === selectedLocationId
+    );
+
+  }, [shelters, selectedLocationId]);
+
+
+  // ----------------------------------------
+  // SEARCH AND STATUS FILTER
+  // ----------------------------------------
+
+  const filteredShelters = useMemo(() => {
+
+    return locationShelters.filter(shelter => {
+
+      const searchText = search.toLowerCase().trim();
+
+      const searchableValues = [
+        shelter.shelter_id,
+        shelter.shelter_name,
+        shelter.location_name,
+        shelter.district,
+        shelter.state,
+        shelter.address
+      ];
+
+      const matchesSearch = searchableValues.some(value =>
+        String(value || "")
+          .toLowerCase()
+          .includes(searchText)
+      );
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        shelter.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+
+    });
+
+  }, [
+    locationShelters,
+    search,
+    statusFilter
+  ]);
+
+
+  // ----------------------------------------
+  // LOCATION-WISE STATISTICS
+  // ----------------------------------------
+
+  const totalShelters = locationShelters.length;
+
+  const operationalShelters = locationShelters.filter(
+    shelter => shelter.status === "operational"
+  ).length;
+
+  const fullShelters = locationShelters.filter(
+    shelter => shelter.status === "full"
+  ).length;
+
+  const totalCapacity = locationShelters.reduce(
+    (sum, shelter) =>
+      sum + Number(shelter.capacity || 0),
+    0
+  );
+
+  const totalOccupied = locationShelters.reduce(
+    (sum, shelter) =>
+      sum + Number(shelter.occupied_count || 0),
+    0
+  );
+
+  const totalAvailable = locationShelters.reduce(
+    (sum, shelter) =>
+      sum + Number(shelter.available || 0),
+    0
+  );
+
+  const occupancyPercentage = totalCapacity > 0
+    ? Math.round((totalOccupied / totalCapacity) * 100)
+    : 0;
+
+
+  // ----------------------------------------
+  // LOCATION OVERVIEW DATA
+  // ----------------------------------------
+
+  const overviewRows = locationSummary.map(location => ({
+
+    locationId: location.location_id,
+
+    name: location.location_name,
+
+    district: location.district,
+
+    state: location.state,
+
+    shelters: location.total_shelters,
+
+    capacity: location.total_capacity,
+
+    occupied: location.total_occupied,
+
+    available: location.total_available,
+
+    operational: location.operational_shelters,
+
+    full: location.full_shelters,
+
+    closed: location.closed_shelters,
+
+    original: location
+
+  }));
+
+
+  const overviewColumns = [
+
+    {
+      key: "name",
+      label: "Location"
+    },
+
+    {
+      key: "district",
+      label: "District"
+    },
+
+    {
+      key: "shelters",
+      label: "Shelters"
+    },
+
+    {
+      key: "capacity",
+      label: "Capacity"
+    },
+
+    {
+      key: "occupied",
+      label: "Occupied"
+    },
+
+    {
+      key: "available",
+      label: "Available"
+    },
+
+    {
+      key: "operational",
+      label: "Operational"
+    },
+
+    {
+      key: "full",
+      label: "Full"
+    }
+
+  ];
+
+
+  // ----------------------------------------
+  // HANDLE INPUTS
+  // ----------------------------------------
+
   const handleChange = (e) => {
 
     const { name, value } = e.target;
@@ -99,164 +386,261 @@ function Shelters() {
       ...previous,
       [name]: value
     }));
+
   };
 
 
+  // ----------------------------------------
   // OPEN ADD FORM
+  // ----------------------------------------
+
   const handleAdd = () => {
 
     setEditingId(null);
 
     setFormData({
       ...emptyForm,
-      location_id: locations.length
-        ? String(locations[0].location_id)
-        : ""
+
+      location_id:
+        selectedLocationId &&
+        selectedLocationId !== "All"
+          ? selectedLocationId
+          : locations.length
+            ? String(locations[0].location_id)
+            : ""
     });
 
     setError("");
+
     setNotice("");
+
     setShowForm(true);
+
   };
 
 
+  // ----------------------------------------
   // OPEN EDIT FORM
+  // ----------------------------------------
+
   const handleEdit = (shelter) => {
 
     setEditingId(shelter.shelter_id);
 
     setFormData({
+
       location_id: String(shelter.location_id),
+
       shelter_name: shelter.shelter_name || "",
+
       address: shelter.address || "",
+
       capacity: String(shelter.capacity),
+
       occupied_count: String(shelter.occupied_count),
+
       contact_person: shelter.contact_person || "",
+
       contact_phone: shelter.contact_phone || "",
-      status: shelter.status
+
+      status: shelter.status || "operational"
+
     });
 
     setError("");
+
     setNotice("");
+
     setShowForm(true);
+
   };
 
 
-  // SAVE OR UPDATE SHELTER
+  // ----------------------------------------
+  // CLOSE FORM
+  // ----------------------------------------
+
+  const closeForm = () => {
+
+    setShowForm(false);
+
+    setEditingId(null);
+
+    setFormData({ ...emptyForm });
+
+    setError("");
+
+  };
+
+
+  // ----------------------------------------
+  // ADD / UPDATE SHELTER
+  // ----------------------------------------
+
   const handleSubmit = async (e) => {
 
     e.preventDefault();
 
+    setError("");
+
+    setNotice("");
+
+
+    const capacity = Number(formData.capacity);
+
+    const occupiedCount = Number(formData.occupied_count);
+
+
+    if (!formData.location_id) {
+
+      setError("Please select a location.");
+
+      return;
+    }
+
+
+    if (!Number.isInteger(capacity) || capacity <= 0) {
+
+      setError("Capacity must be a positive whole number.");
+
+      return;
+    }
+
+
+    if (
+      !Number.isInteger(occupiedCount) ||
+      occupiedCount < 0
+    ) {
+
+      setError("Occupied spaces must be a non-negative whole number.");
+
+      return;
+    }
+
+
+    if (occupiedCount > capacity) {
+
+      setError("Occupied spaces cannot exceed total capacity.");
+
+      return;
+    }
+
+
+    const payload = {
+
+      ...formData,
+
+      location_id: Number(formData.location_id),
+
+      capacity,
+
+      occupied_count: occupiedCount
+
+    };
+
+
     try {
 
       setSaving(true);
-      setError("");
-      setNotice("");
 
       const isEditing = editingId !== null;
 
-      const payload = {
-        ...formData,
-        location_id: Number(formData.location_id),
-        capacity: Number(formData.capacity),
-        occupied_count: Number(formData.occupied_count)
-      };
-
-      const response = await fetch(
+      const response = await apiRequest(
         isEditing
-          ? `${API_URL}/shelters/${editingId}`
-          : `${API_URL}/shelters`,
+          ? `/shelters/${editingId}`
+          : "/shelters",
         {
           method: isEditing ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
           body: JSON.stringify(payload)
         }
       );
 
-      const result = await response.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to save shelter.");
-      }
+      setNotice(
+        response.message ||
+        (
+          isEditing
+            ? "Shelter updated successfully."
+            : "Shelter added successfully."
+        )
+      );
 
       setShowForm(false);
-      setEditingId(null);
-      setFormData(emptyForm);
 
-      setNotice(result.message);
+      setEditingId(null);
+
+      setFormData({ ...emptyForm });
 
       await loadData();
 
     } catch (err) {
 
-      setError(err.message);
+      setError(
+        err.message || "Unable to save shelter."
+      );
 
     } finally {
 
       setSaving(false);
 
     }
+
   };
 
 
+  // ----------------------------------------
   // DELETE SHELTER
-  const handleDelete = async (id) => {
+  // ----------------------------------------
 
-    if (!window.confirm("Are you sure you want to delete this shelter?")) {
-      return;
-    }
+  const handleDelete = async (shelter) => {
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${shelter.shelter_name}"?`
+    );
+
+    if (!confirmed) return;
+
 
     try {
 
+      setDeletingId(shelter.shelter_id);
+
       setError("");
+
       setNotice("");
 
-      const response = await fetch(
-        `${API_URL}/shelters/${id}`,
-        { method: "DELETE" }
+      const response = await apiRequest(
+        `/shelters/${shelter.shelter_id}`,
+        {
+          method: "DELETE"
+        }
       );
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to delete shelter.");
-      }
-
-      setNotice(result.message);
+      setNotice(
+        response.message || "Shelter deleted successfully."
+      );
 
       await loadData();
 
     } catch (err) {
 
-      setError(err.message);
+      setError(
+        err.message || "Unable to delete shelter."
+      );
+
+    } finally {
+
+      setDeletingId(null);
 
     }
+
   };
 
 
-  // SEARCH AND FILTER
-  const filteredShelters = shelters.filter(shelter => {
+  // ----------------------------------------
+  // SHELTER TABLE DATA
+  // ----------------------------------------
 
-    const searchText = search.toLowerCase();
-
-    const matchesSearch = [
-      shelter.shelter_id,
-      shelter.shelter_name,
-      shelter.location_name
-    ].some(value =>
-      String(value || "").toLowerCase().includes(searchText)
-    );
-
-    const matchesStatus =
-      status === "All" || shelter.status === status;
-
-    return matchesSearch && matchesStatus;
-  });
-
-
-  // PREPARE TABLE DATA
   const tableData = filteredShelters.map(shelter => ({
 
     shelterId: shelter.shelter_id,
@@ -273,25 +657,54 @@ function Shelters() {
 
     available: shelter.available,
 
-    status: shelter.status
+    status: shelter.status,
+
+    original: shelter
 
   }));
 
 
+  // ----------------------------------------
   // TABLE COLUMNS
+  // ----------------------------------------
+
   const columns = [
 
-    { key: "id", label: "Shelter ID" },
+    {
+      key: "id",
+      label: "Shelter ID"
+    },
 
-    { key: "name", label: "Shelter Name" },
+    {
+      key: "name",
+      label: "Shelter Name"
+    },
 
-    { key: "location", label: "Location" },
+    // Admin and coordinator can see area details.
+    ...(isVolunteer
+      ? []
+      : [
+          {
+            key: "location",
+            label: "Location"
+          }
+        ]
+    ),
 
-    { key: "capacity", label: "Capacity" },
+    {
+      key: "capacity",
+      label: "Capacity"
+    },
 
-    { key: "occupied", label: "Occupied" },
+    {
+      key: "occupied",
+      label: "Occupied"
+    },
 
-    { key: "available", label: "Available" },
+    {
+      key: "available",
+      label: "Available"
+    },
 
     {
       key: "status",
@@ -303,295 +716,598 @@ function Shelters() {
       )
     },
 
-    {
-      key: "actions",
-      label: "Actions",
-      render: row => (
-        <div className="shelter-actions">
+    ...(canManage
+      ? [
+          {
+            key: "actions",
+            label: "Actions",
+            render: row => (
+              <div className="shelter-actions">
 
-          <button
-            type="button"
-            className="shelter-edit-button"
-            onClick={() => {
-              const selected = shelters.find(
-                s => s.shelter_id === row.shelterId
-              );
+                <button
+                  type="button"
+                  className="shelter-edit-button"
+                  onClick={() => handleEdit(row.original)}
+                >
+                  Edit
+                </button>
 
-              if (selected) handleEdit(selected);
-            }}
-          >
-            Edit
-          </button>
+                <button
+                  type="button"
+                  className="shelter-delete-button"
+                  onClick={() => handleDelete(row.original)}
+                  disabled={deletingId === row.shelterId}
+                >
+                  {deletingId === row.shelterId
+                    ? "Deleting..."
+                    : "Delete"}
+                </button>
 
-          <button
-            type="button"
-            className="shelter-delete-button"
-            onClick={() => handleDelete(row.shelterId)}
-          >
-            Delete
-          </button>
-
-        </div>
-      )
-    }
+              </div>
+            )
+          }
+        ]
+      : [])
 
   ];
 
 
-  // STATISTICS
-  const totalCapacity = shelters.reduce(
-    (sum, s) => sum + Number(s.capacity), 0
-  );
-
-  const totalOccupied = shelters.reduce(
-    (sum, s) => sum + Number(s.occupied_count), 0
-  );
-
+  // ----------------------------------------
+  // PAGE UI
+  // ----------------------------------------
 
   return (
 
-    <div className="module-page">
+    <div className="module-page shelters-page">
 
       <PageHeader
         title="Shelter Management"
-        description="Monitor shelter capacity, occupancy and availability."
+        description="Monitor shelter capacity, occupancy and availability by location."
         action={
-          <button
-            className="module-primary-button"
-            onClick={handleAdd}
-          >
-            Add Shelter
-          </button>
+          canManage && locationSelected && (
+
+            <button
+              type="button"
+              className="module-primary-button"
+              onClick={handleAdd}
+            >
+              + Add Shelter
+            </button>
+
+          )
         }
       />
 
 
       {notice && (
-        <p className="shelter-notice">{notice}</p>
+        <div className="shelter-notice">
+          {notice}
+        </div>
       )}
+
 
       {error && (
-        <p className="shelter-error">{error}</p>
+        <div className="shelter-error">
+          {error}
+        </div>
       )}
 
 
-      <StatGrid>
+      {/* VOLUNTEER LOCATION */}
 
-        <StatCard
-          label="Total Shelters"
-          value={shelters.length}
-        />
+      {isVolunteer && (
 
-        <StatCard
-          label="Operational Shelters"
-          value={shelters.filter(s => s.status === "operational").length}
-        />
+        <div className="shelter-location-banner">
 
-        <StatCard
-          label="Total Capacity"
-          value={totalCapacity}
-        />
+          <div>
+            <span>Your Volunteer Location</span>
 
-        <StatCard
-          label="Occupied Spaces"
-          value={totalOccupied}
-        />
+            <h2>
+              {assignedLocation
+                ? assignedLocation.location_name
+                : "Location not assigned"}
+            </h2>
 
-      </StatGrid>
+            {assignedLocation && (
+
+              <p>
+                {[
+                  assignedLocation.district,
+                  assignedLocation.state
+                ].filter(Boolean).join(", ")}
+              </p>
+
+            )}
+
+          </div>
+
+          <span className="shelter-scope-label">
+            Location-specific view
+          </span>
+
+        </div>
+
+      )}
 
 
-      {showForm && (
+      {/* LOCATION SELECTOR FOR ADMIN / COORDINATOR / NGO */}
 
-        <SectionCard
-          title={editingId ? "Edit Shelter" : "Add New Shelter"}
-        >
+      {!isVolunteer && (
 
-          <form
-            className="module-form"
-            onSubmit={handleSubmit}
-          >
+        <SectionCard title="Select Monitoring Location">
 
-            <label>
-              Shelter Name
-              <input
-                name="shelter_name"
-                value={formData.shelter_name}
-                onChange={handleChange}
-                required
-              />
+          <div className="shelter-location-filter">
+
+            <label htmlFor="shelter-location-filter">
+              View shelter information for
             </label>
 
+            <select
+              id="shelter-location-filter"
+              value={selectedLocationId}
+              onChange={e => setSelectedLocationId(e.target.value)}
+            >
 
-            <label>
-              Location
-              <select
-                name="location_id"
-                value={formData.location_id}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select Location</option>
+              {isCoordinator ? (
 
-                {locations.map(location => (
-                  <option
-                    key={location.location_id}
-                    value={location.location_id}
-                  >
-                    {location.location_name}, {location.district}
-                  </option>
-                ))}
-
-              </select>
-            </label>
-
-
-            <label>
-              Address
-              <textarea
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-              />
-            </label>
-
-
-            <label>
-              Total Capacity
-              <input
-                type="number"
-                name="capacity"
-                min="1"
-                value={formData.capacity}
-                onChange={handleChange}
-                required
-              />
-            </label>
-
-
-            <label>
-              Occupied Spaces
-              <input
-                type="number"
-                name="occupied_count"
-                min="0"
-                value={formData.occupied_count}
-                onChange={handleChange}
-                required
-              />
-            </label>
-
-
-            <label>
-              Contact Person
-              <input
-                name="contact_person"
-                value={formData.contact_person}
-                onChange={handleChange}
-              />
-            </label>
-
-
-            <label>
-              Contact Phone
-              <input
-                name="contact_phone"
-                value={formData.contact_phone}
-                onChange={handleChange}
-              />
-            </label>
-
-
-            <label>
-              Status
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-              >
-                <option value="operational">Operational</option>
-                <option value="full">Full</option>
-                <option value="temporarily_closed">
-                  Temporarily Closed
+                <option value="">
+                  Select the location you are monitoring
                 </option>
-              </select>
-            </label>
+
+              ) : (
+
+                <option value="All">
+                  All Locations
+                </option>
+
+              )}
 
 
-            <div className="full-width shelter-form-actions">
+              {locations.map(location => (
 
-              <button
-                type="submit"
-                className="module-primary-button"
-                disabled={saving || locations.length === 0}
-              >
-                {saving
-                  ? "Saving..."
-                  : editingId
-                    ? "Update Shelter"
-                    : "Save Shelter"}
-              </button>
+                <option
+                  key={location.location_id}
+                  value={String(location.location_id)}
+                >
+                  {location.location_name}, {location.district}, {location.state}
+                </option>
 
-              <button
-                type="button"
-                className="shelter-cancel-button"
-                onClick={() => setShowForm(false)}
-              >
-                Cancel
-              </button>
+              ))}
 
-            </div>
+            </select>
 
-          </form>
+            {isCoordinator && (
+
+              <p className="shelter-filter-hint">
+                Choose the area you are currently monitoring.
+                All statistics below will be specific to that location.
+              </p>
+
+            )}
+
+          </div>
 
         </SectionCard>
 
       )}
 
 
-      <SectionCard title="Shelter List">
+      {/* LOADING */}
 
-        <SearchFilters>
+      {loading ? (
 
-          <input
-            type="text"
-            placeholder="Search by shelter ID, name or location"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <SectionCard title="Shelter Information">
 
-          <select
-            value={status}
-            onChange={e => setStatus(e.target.value)}
-          >
-            <option value="All">All Statuses</option>
-            <option value="operational">Operational</option>
-            <option value="full">Full</option>
-            <option value="temporarily_closed">Temporarily Closed</option>
-          </select>
+          <p className="module-muted">
+            Loading location-wise shelter information...
+          </p>
 
-        </SearchFilters>
+        </SectionCard>
+
+      ) : (
+
+        <>
+
+          {/* VOLUNTEER WITH NO LINKED LOCATION */}
+
+          {isVolunteer && !assignedLocation && (
+
+            <div className="shelter-empty-location">
+
+              <h3>Volunteer location not linked</h3>
+
+              <p>
+                Your volunteer account is not connected to a registered
+                location. Please ask an administrator or coordinator
+                to update your volunteer profile with your location
+                and account email.
+              </p>
+
+            </div>
+
+          )}
 
 
-        {loading ? (
+          {/* COORDINATOR MUST CHOOSE A LOCATION */}
 
-          <p>Loading shelters...</p>
+          {isCoordinator && !selectedLocationId && (
 
-        ) : (
+            <div className="shelter-empty-location">
 
-          <DataTable
-            columns={columns}
-            data={tableData}
-            rowKey="shelterId"
-            emptyMessage="No shelters found."
-          />
+              <h3>Select a location to monitor</h3>
 
-        )}
+              <p>
+                Choose your assigned monitoring area from the dropdown
+                above to view its shelters, occupancy and available spaces.
+              </p>
 
-      </SectionCard>
+            </div>
+
+          )}
+
+
+          {/* LOCATION-SPECIFIC INFORMATION */}
+
+          {locationSelected && (!isVolunteer || assignedLocation) && (
+
+            <>
+
+              <div className="shelter-current-location">
+
+                <span>
+                  {selectedLocationId === "All"
+                    ? "Showing combined information"
+                    : "Currently monitoring"}
+                </span>
+
+                <strong>
+                  {selectedLocationId === "All"
+                    ? "All Locations"
+                    : selectedLocation?.location_name || assignedLocation?.location_name}
+                </strong>
+
+                {selectedLocation && (
+
+                  <small>
+                    {[
+                      selectedLocation.district,
+                      selectedLocation.state
+                    ].filter(Boolean).join(", ")}
+                  </small>
+
+                )}
+
+              </div>
+
+
+              {/* LOCATION-WISE STATISTICS */}
+
+              <StatGrid>
+
+                <StatCard
+                  label="Total Shelters"
+                  value={formatNumber(totalShelters)}
+                  note="In selected location"
+                />
+
+                <StatCard
+                  label="Operational Shelters"
+                  value={formatNumber(operationalShelters)}
+                  note="Currently operational"
+                />
+
+                <StatCard
+                  label="Occupied Spaces"
+                  value={formatNumber(totalOccupied)}
+                  note={`Out of ${formatNumber(totalCapacity)} capacity`}
+                />
+
+                <StatCard
+                  label="Available Spaces"
+                  value={formatNumber(totalAvailable)}
+                  note={`${occupancyPercentage}% occupancy`}
+                />
+
+              </StatGrid>
+
+
+              {/* LOCATION-WISE BREAKDOWN */}
+
+              {isAdmin && (
+
+                <SectionCard title="Shelter Overview by Location">
+
+                  <p className="shelter-section-description">
+                    Compare shelter availability, capacity and occupancy
+                    across all registered locations. Select a location
+                    above to focus on one area.
+                  </p>
+
+                  <div className="shelter-overview-table">
+
+                    <DataTable
+                      columns={overviewColumns}
+                      data={overviewRows}
+                      rowKey="locationId"
+                      emptyMessage="No registered locations found."
+                    />
+
+                  </div>
+
+                </SectionCard>
+
+              )}
+
+
+              {/* SHELTER LIST */}
+
+              <SectionCard title="Shelter List">
+
+                <SearchFilters>
+
+                  <input
+                    type="search"
+                    placeholder="Search shelter name or address..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+
+
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                  >
+
+                    <option value="All">
+                      All Statuses
+                    </option>
+
+                    <option value="operational">
+                      Operational
+                    </option>
+
+                    <option value="full">
+                      Full
+                    </option>
+
+                    <option value="temporarily_closed">
+                      Temporarily Closed
+                    </option>
+
+                  </select>
+
+                </SearchFilters>
+
+
+                <DataTable
+                  columns={columns}
+                  data={tableData}
+                  rowKey="shelterId"
+                  emptyMessage="No shelters found for this location."
+                />
+
+              </SectionCard>
+
+            </>
+
+          )}
+
+        </>
+
+      )}
+
+
+      {/* ADD / EDIT SHELTER */}
+
+      {showForm && canManage && (
+
+        <SectionCard
+          title={
+            editingId
+              ? "Edit Shelter"
+              : "Add New Shelter"
+          }
+        >
+
+          {locations.length === 0 ? (
+
+            <div className="shelter-empty-location">
+
+              No registered locations found.
+              Add a location in Location Management first.
+
+            </div>
+
+          ) : (
+
+            <form
+              className="module-form shelter-form"
+              onSubmit={handleSubmit}
+            >
+
+              <label>
+                Shelter Name *
+
+                <input
+                  type="text"
+                  name="shelter_name"
+                  value={formData.shelter_name}
+                  onChange={handleChange}
+                  maxLength="150"
+                  required
+                />
+
+              </label>
+
+
+              <label>
+                Location *
+
+                <select
+                  name="location_id"
+                  value={formData.location_id}
+                  onChange={handleChange}
+                  required
+                >
+
+                  <option value="">
+                    Select Location
+                  </option>
+
+                  {locations.map(location => (
+
+                    <option
+                      key={location.location_id}
+                      value={location.location_id}
+                    >
+                      {location.location_name}, {location.district}, {location.state}
+                    </option>
+
+                  ))}
+
+                </select>
+
+              </label>
+
+
+              <label className="shelter-full-width">
+                Address
+
+                <textarea
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  rows="3"
+                />
+
+              </label>
+
+
+              <label>
+                Total Capacity *
+
+                <input
+                  type="number"
+                  name="capacity"
+                  min="1"
+                  step="1"
+                  value={formData.capacity}
+                  onChange={handleChange}
+                  required
+                />
+
+              </label>
+
+
+              <label>
+                Occupied Spaces *
+
+                <input
+                  type="number"
+                  name="occupied_count"
+                  min="0"
+                  step="1"
+                  value={formData.occupied_count}
+                  onChange={handleChange}
+                  required
+                />
+
+              </label>
+
+
+              <label>
+                Contact Person
+
+                <input
+                  type="text"
+                  name="contact_person"
+                  value={formData.contact_person}
+                  onChange={handleChange}
+                  maxLength="100"
+                />
+
+              </label>
+
+
+              <label>
+                Contact Phone
+
+                <input
+                  type="tel"
+                  name="contact_phone"
+                  value={formData.contact_phone}
+                  onChange={handleChange}
+                  maxLength="20"
+                />
+
+              </label>
+
+
+              <label>
+                Status
+
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                >
+
+                  <option value="operational">
+                    Operational
+                  </option>
+
+                  <option value="full">
+                    Full
+                  </option>
+
+                  <option value="temporarily_closed">
+                    Temporarily Closed
+                  </option>
+
+                </select>
+
+              </label>
+
+
+              <div className="shelter-form-actions shelter-full-width">
+
+                <button
+                  type="submit"
+                  className="module-primary-button"
+                  disabled={saving}
+                >
+                  {saving
+                    ? "Saving..."
+                    : editingId
+                      ? "Update Shelter"
+                      : "Save Shelter"}
+                </button>
+
+
+                <button
+                  type="button"
+                  className="shelter-cancel-button"
+                  onClick={closeForm}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+
+              </div>
+
+            </form>
+
+          )}
+
+        </SectionCard>
+
+      )}
 
     </div>
 
   );
+
 }
+
 
 export default Shelters;

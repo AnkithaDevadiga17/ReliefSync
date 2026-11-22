@@ -12,6 +12,7 @@ import {
 
 import "../../styles/Modules.css";
 import "./Analytics.css";
+import { apiFetch } from "../../services/api";
 
 const API = "http://127.0.0.1:5000/api";
 
@@ -40,8 +41,8 @@ function Analytics() {
 
       const [summaryResponse, predictionResponse] =
         await Promise.all([
-          fetch(`${API}/analytics/summary`),
-          fetch(`${API}/risk-predictions`)
+          apiFetch(`${API}/analytics/summary`),
+          apiFetch(`${API}/risk-predictions`)
         ]);
 
       const summaryResult = await summaryResponse.json();

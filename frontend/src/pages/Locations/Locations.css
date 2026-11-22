@@ -1,0 +1,106 @@
+.locations-page {
+  width: 100%;
+}
+
+.location-message {
+  padding: 12px 15px;
+  margin-bottom: 18px;
+  border-radius: 7px;
+  font-size: 14px;
+}
+
+.location-success {
+  background: #e5f6e9;
+  color: #236b38;
+  border: 1px solid #bce5c7;
+}
+
+.location-error {
+  background: #fff0f0;
+  color: #a12c2c;
+  border: 1px solid #f0c5c5;
+}
+
+.location-form {
+  margin-top: 5px;
+}
+
+.location-form input:focus,
+.location-form select:focus {
+  outline: none;
+  border-color: #2457a7;
+  box-shadow: 0 0 0 2px rgba(36, 87, 167, 0.12);
+}
+
+.location-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.location-cancel-button {
+  padding: 10px 16px;
+  border: 1px solid #cfd6df;
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  cursor: pointer;
+}
+
+.location-cancel-button:hover {
+  background: #f3f5f7;
+}
+
+.location-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.location-edit-button,
+.location-delete-button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.location-edit-button {
+  background: #e7effb;
+  color: #2457a7;
+}
+
+.location-edit-button:hover {
+  background: #d4e3f8;
+}
+
+.location-delete-button {
+  background: #fdeaea;
+  color: #a12c2c;
+}
+
+.location-delete-button:hover {
+  background: #f8d5d5;
+}
+
+.location-view-note {
+  margin-top: 15px;
+  font-size: 13px;
+}
+
+@media (max-width: 650px) {
+  .location-form {
+    grid-template-columns: 1fr;
+  }
+
+  .location-form-actions {
+    flex-direction: column;
+  }
+
+  .location-form-actions button {
+    width: 100%;
+  }
+}

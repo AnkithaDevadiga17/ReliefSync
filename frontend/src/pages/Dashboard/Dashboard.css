@@ -1,4 +1,3 @@
-
 .dashboard-page {
   width: 100%;
   color: #172b4d;
@@ -46,7 +45,9 @@
   text-decoration: underline;
 }
 
-/* Alerts */
+
+/* OPERATIONS DASHBOARD ALERTS */
+
 .dashboard-alert-list {
   display: flex;
   flex-direction: column;
@@ -80,7 +81,9 @@
   line-height: 1.6;
 }
 
-/* Map placeholder */
+
+/* MAP PLACEHOLDER */
+
 .dashboard-map-placeholder {
   min-height: 250px;
   padding: 25px;
@@ -89,8 +92,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  background:
-    linear-gradient(135deg, #edf4f8, #e3edf5);
+  background: linear-gradient(135deg, #edf4f8, #e3edf5);
   border: 1px dashed #b7c9dc;
   border-radius: 9px;
 }
@@ -112,7 +114,9 @@
   line-height: 1.6;
 }
 
-/* Quick links */
+
+/* QUICK LINKS */
+
 .dashboard-quick-links {
   display: flex;
   flex-direction: column;
@@ -136,7 +140,6 @@
   border-color: #b7cce8;
 }
 
-/* Demo note */
 .dashboard-demo-note {
   margin-top: 22px;
   color: #8993a3;
@@ -144,15 +147,370 @@
   text-align: right;
 }
 
-/* Responsive */
+
+/* =========================================
+   VOLUNTEER PERSONAL DASHBOARD
+========================================= */
+
+.volunteer-dashboard-page {
+  padding-bottom: 25px;
+}
+
+
+/* VOLUNTEER PROFILE */
+
+.volunteer-dashboard-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  margin: 20px 0;
+  background: #f7faff;
+  border: 1px solid #dce7f5;
+  border-radius: 10px;
+}
+
+.volunteer-dashboard-avatar {
+  width: 55px;
+  height: 55px;
+  min-width: 55px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2457a7;
+  color: #fff;
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.volunteer-dashboard-profile-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.volunteer-dashboard-profile-details h2 {
+  margin: 0 0 5px;
+  color: #172b4d;
+  font-size: 18px;
+}
+
+.volunteer-dashboard-profile-details p {
+  margin: 0 0 5px;
+  color: #526078;
+  font-size: 13px;
+}
+
+.volunteer-dashboard-profile-details small {
+  color: #8993a3;
+  font-size: 12px;
+}
+
+.volunteer-dashboard-role {
+  padding: 7px 11px;
+  border-radius: 20px;
+  background: #e7effb;
+  color: #2457a7;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+
+/* TASK LIST */
+
+.volunteer-dashboard-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.volunteer-dashboard-task {
+  padding: 18px;
+  border: 1px solid #e3e8f0;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.volunteer-dashboard-task-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 17px;
+}
+
+.volunteer-dashboard-task-heading h3 {
+  margin: 6px 0 0;
+  color: #172b4d;
+  font-size: 18px;
+}
+
+.volunteer-dashboard-task-id {
+  color: #8993a3;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+
+/* TASK DETAILS */
+
+.volunteer-dashboard-task-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 15px 0;
+  border-top: 1px solid #edf0f5;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.volunteer-dashboard-task-details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.volunteer-dashboard-task-details small {
+  color: #8993a3;
+  font-size: 11px;
+}
+
+.volunteer-dashboard-task-details strong {
+  color: #344054;
+  font-size: 13px;
+}
+
+.volunteer-dashboard-task-details span {
+  color: #667085;
+  font-size: 11px;
+}
+
+
+/* DISASTER DESCRIPTION AND NOTES */
+
+.volunteer-dashboard-description,
+.volunteer-dashboard-notes {
+  padding: 12px 0 0;
+}
+
+.volunteer-dashboard-description strong,
+.volunteer-dashboard-notes strong {
+  color: #344054;
+  font-size: 12px;
+}
+
+.volunteer-dashboard-description p,
+.volunteer-dashboard-notes p {
+  margin: 6px 0 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.volunteer-dashboard-notes {
+  padding: 12px;
+  margin-top: 12px;
+  border-radius: 7px;
+  background: #f7f9fc;
+}
+
+
+/* FILTERS */
+
+.volunteer-dashboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.volunteer-dashboard-filters input,
+.volunteer-dashboard-filters select {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 12px;
+}
+
+.volunteer-dashboard-filters input:focus,
+.volunteer-dashboard-filters select:focus {
+  outline: none;
+  border-color: #2457a7;
+  box-shadow: 0 0 0 2px rgba(36, 87, 167, 0.1);
+}
+
+.volunteer-dashboard-refresh {
+  padding: 9px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #f5f8fc;
+  color: #344b70;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.volunteer-dashboard-refresh:hover {
+  background: #eaf2ff;
+}
+
+
+/* ASSIGNMENT TABLE */
+
+.volunteer-dashboard-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.volunteer-dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.volunteer-dashboard-table thead {
+  background: #f7f8fa;
+}
+
+.volunteer-dashboard-table th {
+  padding: 13px 11px;
+  color: #475467;
+  font-weight: 600;
+  border-bottom: 1px solid #e4e7ec;
+}
+
+.volunteer-dashboard-table td {
+  padding: 13px 11px;
+  color: #344054;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.volunteer-dashboard-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+
+/* EMPTY STATE */
+
+.volunteer-dashboard-no-tasks,
+.volunteer-dashboard-empty {
+  padding: 28px 18px;
+  text-align: center;
+  border: 1px dashed #d6deea;
+  border-radius: 8px;
+  background: #fafcff;
+}
+
+.volunteer-dashboard-no-tasks > span,
+.volunteer-dashboard-empty-icon {
+  font-size: 30px;
+}
+
+.volunteer-dashboard-no-tasks h3,
+.volunteer-dashboard-empty h2 {
+  margin: 10px 0 6px;
+  color: #344054;
+  font-size: 16px;
+}
+
+.volunteer-dashboard-no-tasks p,
+.volunteer-dashboard-empty p {
+  max-width: 500px;
+  margin: 0 auto;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.volunteer-dashboard-empty {
+  margin: 20px 0;
+}
+
+
+/* QUICK ACCESS */
+
+.volunteer-dashboard-quick-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.volunteer-dashboard-quick-links a {
+  display: block;
+  padding: 13px;
+  border: 1px solid #e7edf5;
+  border-radius: 7px;
+  background: #f5f8fc;
+  color: #344b70;
+  text-decoration: none;
+  font-size: 13px;
+  transition: 0.2s ease;
+}
+
+.volunteer-dashboard-quick-links a:hover {
+  background: #eaf2ff;
+  border-color: #b7cce8;
+}
+
+
+/* ERROR */
+
+.volunteer-dashboard-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  margin-bottom: 16px;
+  background: #fff0f0;
+  border: 1px solid #f0c5c5;
+  border-radius: 7px;
+  color: #a12c2c;
+  font-size: 13px;
+}
+
+.volunteer-dashboard-error button {
+  padding: 7px 12px;
+  border: 1px solid #e7bebe;
+  border-radius: 5px;
+  background: #fff;
+  color: #a12c2c;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dashboard-volunteer-muted {
+  color: #667085;
+  font-size: 13px;
+}
+
+
+/* RESPONSIVE */
+
 @media (max-width: 950px) {
+
   .dashboard-main-grid,
   .dashboard-bottom-grid {
     grid-template-columns: 1fr;
   }
+
+  .volunteer-dashboard-task-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
 }
 
+
 @media (max-width: 600px) {
+
   .dashboard-stat-wrapper {
     min-width: 100%;
   }
@@ -161,4 +519,31 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .volunteer-dashboard-profile {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .volunteer-dashboard-role {
+    margin-left: 70px;
+  }
+
+  .volunteer-dashboard-task-heading {
+    flex-direction: column;
+  }
+
+  .volunteer-dashboard-task-details {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .volunteer-dashboard-quick-links {
+    grid-template-columns: 1fr;
+  }
+
+  .volunteer-dashboard-error {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
 }

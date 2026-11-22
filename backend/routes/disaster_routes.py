@@ -1,28 +1,195 @@
-
 from datetime import date
+import logging
+import math
 
 import pymysql
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 from config.db import get_db_connection
 
 
-# -----------------------------------
-# CREATE DISASTER BLUEPRINT
-# -----------------------------------
+disaster_bp = Blueprint("disasters", __name__)
 
-disaster_bp = Blueprint(
-    "disasters",
-    __name__
-)
+ALLOWED_ROLES = {"admin", "coordinator", "ngo", "volunteer"}
+MANAGER_ROLES = {"admin", "coordinator"}
+
+SEVERITIES = {"low", "medium", "high", "critical"}
+
+STATUSES = {
+    "reported",
+    "active",
+    "monitoring",
+    "resolved",
+    "closed"
+}
 
 
-# -----------------------------------
-# 1. GET API - VIEW ALL DISASTERS
-# -----------------------------------
+# --------------------------------------------------
+# AUTHORIZATION
+# --------------------------------------------------
+
+def check_access(allowed_roles):
+
+    if "user_id" not in session:
+        return jsonify({
+            "success": False,
+            "message": "Please log in first."
+        }), 401
+
+    role = str(session.get("role", "")).strip().lower()
+
+    if role not in allowed_roles:
+        return jsonify({
+            "success": False,
+            "message": "You do not have permission to perform this action."
+        }), 403
+
+    return None
+
+
+# --------------------------------------------------
+# VALIDATE DISASTER DATA
+# --------------------------------------------------
+
+def validate_disaster_data(data, partial=False):
+
+    if not isinstance(data, dict):
+        return None, "Please provide valid disaster details."
+
+    result = {}
+
+    # Location
+    if not partial or "location_id" in data:
+
+        try:
+            location_id = int(data.get("location_id"))
+
+            if location_id <= 0:
+                raise ValueError
+
+            result["location_id"] = location_id
+
+        except (ValueError, TypeError):
+            return None, "Please select a valid location."
+
+    # Disaster type
+    if not partial or "disaster_type" in data:
+
+        disaster_type = str(
+            data.get("disaster_type") or ""
+        ).strip()
+
+        if not disaster_type:
+            return None, "Disaster type is required."
+
+        if len(disaster_type) > 60:
+            return None, "Disaster type must not exceed 60 characters."
+
+        result["disaster_type"] = disaster_type
+
+    # Severity
+    if not partial or "severity" in data:
+
+        severity = str(
+            data.get("severity") or ""
+        ).strip().lower()
+
+        if severity not in SEVERITIES:
+            return None, "Please select a valid severity."
+
+        result["severity"] = severity
+
+    # Status
+    if not partial or "status" in data:
+
+        status = str(
+            data.get("status") or (
+                "reported" if not partial else ""
+            )
+        ).strip().lower()
+
+        if status not in STATUSES:
+            return None, "Please select a valid disaster status."
+
+        result["status"] = status
+
+    # Incident date
+    if not partial or "incident_date" in data:
+
+        incident_date = data.get("incident_date")
+
+        if incident_date in (None, ""):
+            result["incident_date"] = None
+
+        else:
+            try:
+                result["incident_date"] = date.fromisoformat(
+                    str(incident_date)
+                )
+
+            except (ValueError, TypeError):
+                return None, "Invalid incident date. Use YYYY-MM-DD."
+
+    # Description
+    if not partial or "description" in data:
+
+        description = data.get("description")
+
+        if description is not None and not isinstance(description, str):
+            return None, "Description must be valid text."
+
+        description = (description or "").strip()
+
+        result["description"] = description or None
+
+    # Coordinates
+    coordinate_fields = {"latitude", "longitude"}
+
+    if not partial or coordinate_fields.intersection(data.keys()):
+
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+
+        if (latitude in (None, "")) != (longitude in (None, "")):
+            return None, "Enter both latitude and longitude, or leave both empty."
+
+        try:
+
+            if latitude in (None, ""):
+                latitude = None
+                longitude = None
+
+            else:
+                latitude = float(latitude)
+                longitude = float(longitude)
+
+                if not math.isfinite(latitude) or not -90 <= latitude <= 90:
+                    return None, "Latitude must be between -90 and 90."
+
+                if not math.isfinite(longitude) or not -180 <= longitude <= 180:
+                    return None, "Longitude must be between -180 and 180."
+
+        except (ValueError, TypeError):
+            return None, "Please enter valid coordinates."
+
+        result["latitude"] = latitude
+        result["longitude"] = longitude
+
+    return result, None
+
+
+# --------------------------------------------------
+# GET ALL DISASTERS
+# All authenticated roles can view
+# --------------------------------------------------
 
 @disaster_bp.route("/disasters", methods=["GET"])
 def get_disasters():
+
+    access_error = check_access(ALLOWED_ROLES)
+
+    if access_error:
+        return access_error
 
     connection = None
 
@@ -32,22 +199,34 @@ def get_disasters():
 
         with connection.cursor() as cursor:
 
-            # JOIN disasters and locations tables
             cursor.execute("""
                 SELECT
                     d.disaster_id,
                     d.location_id,
                     l.location_name,
+                    l.district,
+                    l.state,
+                    l.country,
                     d.disaster_type,
                     d.severity,
                     d.status,
                     d.description,
                     d.incident_date,
                     d.latitude,
-                    d.longitude
-                FROM disasters AS d
-                LEFT JOIN locations AS l
+                    d.longitude,
+                    d.reported_by,
+                    u.full_name AS reporter_name,
+                    d.reported_at,
+                    d.resolved_at
+
+                FROM disasters d
+
+                LEFT JOIN locations l
                     ON d.location_id = l.location_id
+
+                LEFT JOIN users u
+                    ON d.reported_by = u.user_id
+
                 ORDER BY d.reported_at DESC
             """)
 
@@ -57,17 +236,15 @@ def get_disasters():
             "success": True,
             "count": len(disasters),
             "data": disasters
-        })
+        }), 200
 
     except Exception:
 
-        # Print detailed error in Flask terminal
-        import logging
         logging.exception("Could not retrieve disasters")
 
         return jsonify({
             "success": False,
-            "message": "Unable to retrieve disaster records."
+            "message": "Unable to retrieve disaster reports."
         }), 500
 
     finally:
@@ -76,176 +253,50 @@ def get_disasters():
             connection.close()
 
 
-# -----------------------------------
-# 2. POST API - ADD A NEW DISASTER
-# -----------------------------------
+# --------------------------------------------------
+# CREATE DISASTER
+# Admin and Coordinator
+# --------------------------------------------------
 
 @disaster_bp.route("/disasters", methods=["POST"])
-def add_disaster():
+def create_disaster():
+
+    access_error = check_access(MANAGER_ROLES)
+
+    if access_error:
+        return access_error
+
+    data = request.get_json(silent=True)
+
+    disaster, error = validate_disaster_data(data)
+
+    if error:
+        return jsonify({
+            "success": False,
+            "message": error
+        }), 400
 
     connection = None
 
     try:
 
-        # Receive JSON data
-        data = request.get_json(silent=True)
-
-        if not isinstance(data, dict):
-
-            return jsonify({
-                "success": False,
-                "message": "Please provide valid JSON data."
-            }), 400
-
-        # Check required fields
-        required_fields = [
-            "location_id",
-            "disaster_type",
-            "severity"
-        ]
-
-        missing_fields = [
-            field for field in required_fields
-            if field not in data or data[field] is None
-        ]
-
-        if missing_fields:
-
-            return jsonify({
-                "success": False,
-                "message": "Missing required fields.",
-                "missing_fields": missing_fields
-            }), 400
-
-        # Validate location ID
-        try:
-
-            location_id = int(data["location_id"])
-
-            if location_id <= 0:
-                raise ValueError()
-
-        except (ValueError, TypeError):
-
-            return jsonify({
-                "success": False,
-                "message": "Invalid location ID."
-            }), 400
-
-        # Validate disaster type
-        disaster_type = str(data["disaster_type"]).strip()
-
-        if not disaster_type or len(disaster_type) > 60:
-
-            return jsonify({
-                "success": False,
-                "message": "Disaster type must be between 1 and 60 characters."
-            }), 400
-
-        # Validate severity
-        severity = str(data["severity"]).lower()
-
-        allowed_severities = [
-            "low",
-            "medium",
-            "high",
-            "critical"
-        ]
-
-        if severity not in allowed_severities:
-
-            return jsonify({
-                "success": False,
-                "message": "Invalid severity value."
-            }), 400
-
-        # Validate status
-        status = str(data.get("status") or "reported").lower()
-
-        allowed_statuses = [
-            "reported",
-            "active",
-            "monitoring",
-            "resolved",
-            "closed"
-        ]
-
-        if status not in allowed_statuses:
-
-            return jsonify({
-                "success": False,
-                "message": "Invalid disaster status."
-            }), 400
-
-        # Validate incident date
-        incident_date = data.get("incident_date")
-
-        if incident_date:
-
-            try:
-                incident_date = date.fromisoformat(
-                    str(incident_date)
-                )
-
-            except ValueError:
-
-                return jsonify({
-                    "success": False,
-                    "message": "Incident date must use YYYY-MM-DD format."
-                }), 400
-
-        # Validate coordinates
-        try:
-
-            latitude = (
-                float(data["latitude"])
-                if data.get("latitude") is not None
-                else None
-            )
-
-            longitude = (
-                float(data["longitude"])
-                if data.get("longitude") is not None
-                else None
-            )
-
-        except (ValueError, TypeError):
-
-            return jsonify({
-                "success": False,
-                "message": "Coordinates must be valid numbers."
-            }), 400
-
-        if latitude is not None and not -90 <= latitude <= 90:
-
-            return jsonify({
-                "success": False,
-                "message": "Invalid latitude."
-            }), 400
-
-        if longitude is not None and not -180 <= longitude <= 180:
-
-            return jsonify({
-                "success": False,
-                "message": "Invalid longitude."
-            }), 400
-
-        # Validate description
-        description = data.get("description")
-
-        if description is not None and not isinstance(description, str):
-
-            return jsonify({
-                "success": False,
-                "message": "Description must be text."
-            }), 400
-
-        # Connect to MySQL
         connection = get_db_connection()
 
         with connection.cursor() as cursor:
 
-            # Insert disaster into database
+            # Verify that the selected location exists.
+            cursor.execute("""
+                SELECT location_id
+                FROM locations
+                WHERE location_id = %s
+            """, (disaster["location_id"],))
+
+            if not cursor.fetchone():
+                return jsonify({
+                    "success": False,
+                    "message": "Selected location does not exist."
+                }), 404
+
             cursor.execute("""
                 INSERT INTO disasters (
                     location_id,
@@ -260,49 +311,47 @@ def add_disaster():
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
-                location_id,
-                None,
-                disaster_type,
-                severity,
-                status,
-                description,
-                incident_date,
-                latitude,
-                longitude
+                disaster["location_id"],
+                session.get("user_id"),
+                disaster["disaster_type"],
+                disaster["severity"],
+                disaster["status"],
+                disaster["description"],
+                disaster["incident_date"],
+                disaster["latitude"],
+                disaster["longitude"]
             ))
 
-            new_disaster_id = cursor.lastrowid
+            disaster_id = cursor.lastrowid
 
-        # Save changes
         connection.commit()
 
         return jsonify({
             "success": True,
-            "message": "Disaster added successfully!",
-            "disaster_id": new_disaster_id
+            "message": "Disaster report created successfully.",
+            "disaster_id": disaster_id
         }), 201
 
-    except pymysql.err.IntegrityError:
+    except pymysql.IntegrityError:
 
         if connection:
             connection.rollback()
 
         return jsonify({
             "success": False,
-            "message": "Invalid location ID. Please select an existing location."
-        }), 400
+            "message": "Invalid location or related database record."
+        }), 409
 
     except Exception:
 
         if connection:
             connection.rollback()
 
-        import logging
-        logging.exception("Could not add disaster")
+        logging.exception("Could not create disaster")
 
         return jsonify({
             "success": False,
-            "message": "Unable to add disaster."
+            "message": "Unable to create disaster report."
         }), 500
 
     finally:
@@ -311,9 +360,10 @@ def add_disaster():
             connection.close()
 
 
-# -----------------------------------
-# 3. PUT API - UPDATE A DISASTER
-# -----------------------------------
+# --------------------------------------------------
+# UPDATE DISASTER
+# Admin and Coordinator
+# --------------------------------------------------
 
 @disaster_bp.route(
     "/disasters/<int:disaster_id>",
@@ -321,141 +371,119 @@ def add_disaster():
 )
 def update_disaster(disaster_id):
 
+    access_error = check_access(MANAGER_ROLES)
+
+    if access_error:
+        return access_error
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict) or not data:
+        return jsonify({
+            "success": False,
+            "message": "Please provide fields to update."
+        }), 400
+
+    disaster, error = validate_disaster_data(
+        data,
+        partial=True
+    )
+
+    if error:
+        return jsonify({
+            "success": False,
+            "message": error
+        }), 400
+
+    allowed_fields = {
+        "location_id",
+        "disaster_type",
+        "severity",
+        "status",
+        "description",
+        "incident_date",
+        "latitude",
+        "longitude"
+    }
+
+    update_fields = {
+        key: value
+        for key, value in disaster.items()
+        if key in allowed_fields
+    }
+
+    if not update_fields:
+        return jsonify({
+            "success": False,
+            "message": "No valid fields provided for update."
+        }), 400
+
     connection = None
 
     try:
-
-        data = request.get_json(silent=True)
-
-        if not isinstance(data, dict):
-
-            return jsonify({
-                "success": False,
-                "message": "Please provide valid JSON data."
-            }), 400
 
         connection = get_db_connection()
 
         with connection.cursor() as cursor:
 
-            # Check whether disaster exists
-            cursor.execute(
-                "SELECT disaster_id FROM disasters WHERE disaster_id = %s",
-                (disaster_id,)
-            )
+            cursor.execute("""
+                SELECT disaster_id
+                FROM disasters
+                WHERE disaster_id = %s
+                FOR UPDATE
+            """, (disaster_id,))
 
-            existing = cursor.fetchone()
-
-            if not existing:
-
+            if not cursor.fetchone():
                 return jsonify({
                     "success": False,
                     "message": "Disaster not found."
                 }), 404
 
-            updates = []
-            values = []
+            # Verify a new location if one was selected.
+            if "location_id" in update_fields:
 
-            # Update severity
-            if "severity" in data:
+                cursor.execute("""
+                    SELECT location_id
+                    FROM locations
+                    WHERE location_id = %s
+                """, (update_fields["location_id"],))
 
-                severity = str(data["severity"]).lower()
-
-                allowed_severities = [
-                    "low",
-                    "medium",
-                    "high",
-                    "critical"
-                ]
-
-                if severity not in allowed_severities:
-
+                if not cursor.fetchone():
                     return jsonify({
                         "success": False,
-                        "message": "Invalid severity value."
-                    }), 400
+                        "message": "Selected location does not exist."
+                    }), 404
 
-                updates.append("severity = %s")
-                values.append(severity)
+            assignments = [
+                f"{field} = %s"
+                for field in update_fields
+            ]
 
-            # Update status
-            if "status" in data:
+            values = list(update_fields.values())
 
-                status = str(data["status"]).lower()
+            if "status" in update_fields:
 
-                allowed_statuses = [
-                    "reported",
-                    "active",
-                    "monitoring",
-                    "resolved",
-                    "closed"
-                ]
+                if update_fields["status"] in {"resolved", "closed"}:
+                    assignments.append("resolved_at = CURRENT_TIMESTAMP")
 
-                if status not in allowed_statuses:
+                else:
+                    assignments.append("resolved_at = NULL")
 
-                    return jsonify({
-                        "success": False,
-                        "message": "Invalid disaster status."
-                    }), 400
-
-                updates.append("status = %s")
-                values.append(status)
-
-            # Update description
-            if "description" in data:
-
-                description = data["description"]
-
-                if description is not None and not isinstance(description, str):
-
-                    return jsonify({
-                        "success": False,
-                        "message": "Description must be text or null."
-                    }), 400
-
-                updates.append("description = %s")
-                values.append(description)
-
-            if not updates:
-
-                return jsonify({
-                    "success": False,
-                    "message": "No update fields provided."
-                }), 400
-
-            # Execute UPDATE query
-            sql = (
-                "UPDATE disasters SET "
-                + ", ".join(updates)
-                + " WHERE disaster_id = %s"
-            )
+            query = f"""
+                UPDATE disasters
+                SET {", ".join(assignments)}
+                WHERE disaster_id = %s
+            """
 
             values.append(disaster_id)
 
-            cursor.execute(sql, tuple(values))
-
-            # Retrieve updated record
-            cursor.execute("""
-                SELECT
-                    disaster_id,
-                    location_id,
-                    disaster_type,
-                    severity,
-                    status,
-                    description,
-                    incident_date
-                FROM disasters
-                WHERE disaster_id = %s
-            """, (disaster_id,))
-
-            updated_disaster = cursor.fetchone()
+            cursor.execute(query, tuple(values))
 
         connection.commit()
 
         return jsonify({
             "success": True,
-            "message": "Disaster updated successfully!",
-            "data": updated_disaster
+            "message": "Disaster report updated successfully."
         }), 200
 
     except Exception:
@@ -463,12 +491,11 @@ def update_disaster(disaster_id):
         if connection:
             connection.rollback()
 
-        import logging
         logging.exception("Could not update disaster")
 
         return jsonify({
             "success": False,
-            "message": "Unable to update disaster."
+            "message": "Unable to update disaster report."
         }), 500
 
     finally:
@@ -477,15 +504,21 @@ def update_disaster(disaster_id):
             connection.close()
 
 
-# -----------------------------------
-# 4. DELETE API - REMOVE A DISASTER
-# -----------------------------------
+# --------------------------------------------------
+# DELETE DISASTER
+# Admin and Coordinator
+# --------------------------------------------------
 
 @disaster_bp.route(
     "/disasters/<int:disaster_id>",
     methods=["DELETE"]
 )
 def delete_disaster(disaster_id):
+
+    access_error = check_access(MANAGER_ROLES)
+
+    if access_error:
+        return access_error
 
     connection = None
 
@@ -495,36 +528,66 @@ def delete_disaster(disaster_id):
 
         with connection.cursor() as cursor:
 
-            # Check whether disaster exists
-            cursor.execute(
-                "SELECT disaster_id FROM disasters WHERE disaster_id = %s",
-                (disaster_id,)
-            )
+            cursor.execute("""
+                SELECT disaster_id
+                FROM disasters
+                WHERE disaster_id = %s
+                FOR UPDATE
+            """, (disaster_id,))
 
-            existing = cursor.fetchone()
-
-            if not existing:
-
+            if not cursor.fetchone():
                 return jsonify({
                     "success": False,
                     "message": "Disaster not found."
                 }), 404
 
-            # Delete disaster
-            cursor.execute(
-                "DELETE FROM disasters WHERE disaster_id = %s",
-                (disaster_id,)
-            )
+            # Do not delete disasters connected to transactions.
+            linked_tables = [
+                "resource_allocations",
+                "volunteer_assignments",
+                "donation_distributions",
+                "risk_predictions"
+            ]
+
+            linked_modules = []
+
+            for table in linked_tables:
+
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(*) AS total
+                    FROM {table}
+                    WHERE disaster_id = %s
+                    """,
+                    (disaster_id,)
+                )
+
+                if cursor.fetchone()["total"] > 0:
+                    linked_modules.append(table)
+
+            if linked_modules:
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        "This disaster is linked to other records "
+                        "and cannot be deleted."
+                    ),
+                    "linked_modules": linked_modules
+                }), 409
+
+            cursor.execute("""
+                DELETE FROM disasters
+                WHERE disaster_id = %s
+            """, (disaster_id,))
 
         connection.commit()
 
         return jsonify({
             "success": True,
-            "message": "Disaster deleted successfully!",
-            "deleted_disaster_id": disaster_id
+            "message": "Disaster report deleted successfully."
         }), 200
 
-    except pymysql.err.IntegrityError:
+    except pymysql.IntegrityError:
 
         if connection:
             connection.rollback()
@@ -539,12 +602,11 @@ def delete_disaster(disaster_id):
         if connection:
             connection.rollback()
 
-        import logging
         logging.exception("Could not delete disaster")
 
         return jsonify({
             "success": False,
-            "message": "Unable to delete disaster."
+            "message": "Unable to delete disaster report."
         }), 500
 
     finally:

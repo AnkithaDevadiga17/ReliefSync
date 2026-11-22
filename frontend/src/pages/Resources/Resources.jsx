@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   DataTable,
@@ -11,10 +10,12 @@ import {
   StatusBadge
 } from "../../components/ModuleUI";
 
+import { apiRequest } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+
 import "../../styles/Modules.css";
 import "./Resources.css";
 
-const API = "http://127.0.0.1:5000/api";
 
 const emptyResource = {
   location_id: "",
@@ -25,94 +26,284 @@ const emptyResource = {
   minimum_stock: "0"
 };
 
-const emptyAllocation = {
-  resource_id: "",
-  disaster_id: "",
-  quantity_allocated: "",
-  notes: ""
-};
+
+const resourceCategories = [
+  "Food",
+  "Water",
+  "Medicine",
+  "Clothing",
+  "Rescue Equipment",
+  "Other"
+];
+
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("en-IN");
+}
 
 
 function Resources() {
 
+  const { user } = useAuth();
+
+  const role = user?.role?.toLowerCase();
+
+  const isAdmin = role === "admin";
+  const isCoordinator = role === "coordinator";
+  const isVolunteer = role === "volunteer";
+
+  const canManage = [
+    "admin",
+    "coordinator",
+    "ngo"
+  ].includes(role);
+
+
+  // -----------------------------------------
+  // DATA
+  // -----------------------------------------
+
   const [resources, setResources] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [disasters, setDisasters] = useState([]);
-  const [allocations, setAllocations] = useState([]);
+  const [locationSummary, setLocationSummary] = useState([]);
+  const [assignedLocation, setAssignedLocation] = useState(null);
+
+
+  // -----------------------------------------
+  // LOCATION FILTER
+  // -----------------------------------------
+
+  const [selectedLocationId, setSelectedLocationId] =
+    useState(isCoordinator ? "" : "All");
+
+
+  // -----------------------------------------
+  // SEARCH AND STOCK FILTER
+  // -----------------------------------------
 
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState("All");
 
+
+  // -----------------------------------------
+  // FORM STATE
+  // -----------------------------------------
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [resourceForm, setResourceForm] = useState(emptyResource);
+
+
+  // -----------------------------------------
+  // REQUEST STATE
+  // -----------------------------------------
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const [showResourceForm, setShowResourceForm] = useState(false);
-  const [showAllocationForm, setShowAllocationForm] = useState(false);
 
-  const [editingId, setEditingId] = useState(null);
+  // -----------------------------------------
+  // LOAD INVENTORY FOR SELECTED LOCATION
+  // -----------------------------------------
 
-  const [resourceForm, setResourceForm] = useState(emptyResource);
-  const [allocationForm, setAllocationForm] = useState(emptyAllocation);
+  const loadInventory = async (locationId = null) => {
+
+    let endpoint = "/resources";
+
+    if (locationId && locationId !== "All") {
+      endpoint += `?location_id=${encodeURIComponent(locationId)}`;
+    }
+
+    const response = await apiRequest(endpoint);
+
+    setResources(response.data || []);
+
+    setLocationSummary(response.location_summary || []);
+
+    return response;
+  };
 
 
-  // --------------------------------
-  // LOAD ALL DATA
-  // --------------------------------
+  // -----------------------------------------
+  // INITIAL PAGE LOAD
+  // -----------------------------------------
 
-  const loadData = async () => {
+  const loadPage = async () => {
 
     try {
 
       setLoading(true);
       setError("");
 
-      const responses = await Promise.all([
-        fetch(`${API}/resources`),
-        fetch(`${API}/locations`),
-        fetch(`${API}/disasters`),
-        fetch(`${API}/allocations`)
-      ]);
+      if (isVolunteer) {
 
-      const results = await Promise.all(
-        responses.map(response => response.json())
-      );
+        const response = await apiRequest("/resources");
 
-      responses.forEach((response, index) => {
-        if (!response.ok || !results[index].success) {
-          throw new Error(
-            results[index].message || "Unable to load module data."
-          );
+        setResources(response.data || []);
+
+        setLocationSummary(
+          response.location_summary || []
+        );
+
+        const scope = response.scope || {};
+
+        setAssignedLocation(
+          scope.assigned_location || null
+        );
+
+        setSelectedLocationId(
+          scope.assigned_location_id
+            ? String(scope.assigned_location_id)
+            : ""
+        );
+
+        setLocations([]);
+
+      } else {
+
+        const locationResponse = await apiRequest("/locations");
+
+        setLocations(locationResponse.data || []);
+
+        if (isCoordinator) {
+
+          setResources([]);
+          setLocationSummary([]);
+          setSelectedLocationId("");
+
+        } else {
+
+          setSelectedLocationId("All");
+
+          await loadInventory();
+
         }
-      });
 
-      setResources(results[0].data || []);
-      setLocations(results[1].data || []);
-      setDisasters(results[2].data || []);
-      setAllocations(results[3].data || []);
+      }
 
     } catch (err) {
 
-      setError(err.message);
+      setError(
+        err.message || "Unable to load resource information."
+      );
 
     } finally {
 
       setLoading(false);
 
     }
+
   };
 
 
   useEffect(() => {
-    loadData();
+    loadPage();
   }, []);
 
 
-  // --------------------------------
+  // -----------------------------------------
+  // CHANGE LOCATION
+  // -----------------------------------------
+
+  const handleLocationSelect = async (e) => {
+
+    const locationId = e.target.value;
+
+    setSelectedLocationId(locationId);
+
+    setError("");
+    setNotice("");
+
+    setSearch("");
+    setStockFilter("All");
+
+    if (!locationId) {
+
+      setResources([]);
+      setLocationSummary([]);
+
+      return;
+    }
+
+    try {
+
+      setLoading(true);
+
+      await loadInventory(locationId);
+
+    } catch (err) {
+
+      setError(
+        err.message || "Unable to load inventory for this location."
+      );
+
+      setResources([]);
+      setLocationSummary([]);
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+
+  // -----------------------------------------
+  // IMPORTANT: FRONTEND LOCATION FILTER
+  // -----------------------------------------
+
+  const locationScopedResources = useMemo(() => {
+
+    // Admin and NGO viewing all locations.
+    if (
+      !selectedLocationId ||
+      selectedLocationId === "All"
+    ) {
+      return resources;
+    }
+
+    // Only show resources belonging to selected location.
+    return resources.filter(resource =>
+
+      String(resource.location_id) ===
+      String(selectedLocationId)
+
+    );
+
+  }, [resources, selectedLocationId]);
+
+
+  // -----------------------------------------
+  // LOCATION SUMMARY FILTER
+  // -----------------------------------------
+
+  const locationScopedSummary = useMemo(() => {
+
+    if (
+      !selectedLocationId ||
+      selectedLocationId === "All"
+    ) {
+      return locationSummary;
+    }
+
+    return locationSummary.filter(location =>
+
+      String(location.location_id) ===
+      String(selectedLocationId)
+
+    );
+
+  }, [locationSummary, selectedLocationId]);
+
+
+  // -----------------------------------------
   // HANDLE RESOURCE INPUTS
-  // --------------------------------
+  // -----------------------------------------
 
   const handleResourceChange = (e) => {
 
@@ -126,99 +317,172 @@ function Resources() {
   };
 
 
+  // -----------------------------------------
   // OPEN ADD RESOURCE FORM
+  // -----------------------------------------
+
   const handleAddResource = () => {
+
+    const defaultLocation =
+      selectedLocationId &&
+      selectedLocationId !== "All"
+        ? selectedLocationId
+        : locations.length
+          ? String(locations[0].location_id)
+          : "";
 
     setEditingId(null);
 
     setResourceForm({
       ...emptyResource,
-      location_id: locations.length
-        ? String(locations[0].location_id)
-        : ""
+      location_id: defaultLocation
     });
 
     setError("");
     setNotice("");
-    setShowResourceForm(true);
+
+    setShowForm(true);
 
   };
 
 
+  // -----------------------------------------
   // OPEN EDIT RESOURCE FORM
+  // -----------------------------------------
+
   const handleEditResource = (resource) => {
 
     setEditingId(resource.resource_id);
 
     setResourceForm({
+
       location_id: String(resource.location_id),
-      resource_name: resource.resource_name,
-      category: resource.category,
+      resource_name: resource.resource_name || "",
+      category: resource.category || "Other",
       quantity_available: String(resource.quantity_available),
-      unit: resource.unit,
-      minimum_stock: String(resource.minimum_stock)
+      unit: resource.unit || "",
+      minimum_stock: String(resource.minimum_stock ?? 0)
+
     });
 
     setError("");
     setNotice("");
-    setShowResourceForm(true);
+
+    setShowForm(true);
 
   };
 
 
-  // --------------------------------
-  // ADD OR UPDATE RESOURCE
-  // --------------------------------
+  // -----------------------------------------
+  // CLOSE FORM
+  // -----------------------------------------
+
+  const closeForm = () => {
+
+    setShowForm(false);
+
+    setEditingId(null);
+
+    setResourceForm({ ...emptyResource });
+
+    setError("");
+
+  };
+
+
+  // -----------------------------------------
+  // ADD / UPDATE RESOURCE
+  // -----------------------------------------
 
   const handleResourceSubmit = async (e) => {
 
     e.preventDefault();
 
+    setError("");
+    setNotice("");
+
+    if (!resourceForm.location_id) {
+
+      setError("Please select a location.");
+
+      return;
+    }
+
+    const quantity = Number(
+      resourceForm.quantity_available
+    );
+
+    const minimumStock = Number(
+      resourceForm.minimum_stock
+    );
+
+    if (!Number.isFinite(quantity) || quantity < 0) {
+
+      setError("Enter a valid available quantity.");
+
+      return;
+    }
+
+    if (!Number.isFinite(minimumStock) || minimumStock < 0) {
+
+      setError("Enter a valid minimum stock level.");
+
+      return;
+    }
+
+    const payload = {
+
+      ...resourceForm,
+
+      location_id: Number(resourceForm.location_id),
+
+      quantity_available: quantity,
+
+      minimum_stock: minimumStock
+
+    };
+
     try {
 
       setSaving(true);
-      setError("");
-      setNotice("");
 
       const isEditing = editingId !== null;
 
-      const payload = {
-        ...resourceForm,
-        location_id: Number(resourceForm.location_id),
-        quantity_available: Number(resourceForm.quantity_available),
-        minimum_stock: Number(resourceForm.minimum_stock)
-      };
-
-      const response = await fetch(
+      const response = await apiRequest(
         isEditing
-          ? `${API}/resources/${editingId}`
-          : `${API}/resources`,
+          ? `/resources/${editingId}`
+          : "/resources",
         {
           method: isEditing ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
           body: JSON.stringify(payload)
         }
       );
 
-      const result = await response.json();
+      setNotice(
+        response.message ||
+        (
+          isEditing
+            ? "Resource updated successfully."
+            : "Resource added successfully."
+        )
+      );
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to save resource.");
-      }
-
-      setShowResourceForm(false);
+      setShowForm(false);
       setEditingId(null);
-      setResourceForm(emptyResource);
 
-      setNotice(result.message);
+      setResourceForm({ ...emptyResource });
 
-      await loadData();
+      await loadInventory(
+        selectedLocationId === "All"
+          ? null
+          : selectedLocationId
+      );
 
     } catch (err) {
 
-      setError(err.message);
+      setError(
+        err.message || "Unable to save resource."
+      );
 
     } finally {
 
@@ -229,228 +493,80 @@ function Resources() {
   };
 
 
-  // --------------------------------
+  // -----------------------------------------
   // DELETE RESOURCE
-  // --------------------------------
+  // -----------------------------------------
 
-  const handleDeleteResource = async (id) => {
+  const handleDeleteResource = async (resource) => {
 
-    if (!window.confirm("Delete this resource?")) return;
+    const confirmed = window.confirm(
+      `Delete "${resource.resource_name}" from ${resource.location_name} inventory?\n\nResources with allocation records cannot be deleted.`
+    );
+
+    if (!confirmed) return;
 
     try {
+
+      setDeletingId(resource.resource_id);
 
       setError("");
       setNotice("");
 
-      const response = await fetch(
-        `${API}/resources/${id}`,
-        { method: "DELETE" }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to delete resource.");
-      }
-
-      setNotice(result.message);
-
-      await loadData();
-
-    } catch (err) {
-
-      setError(err.message);
-
-    }
-
-  };
-
-
-  // --------------------------------
-  // HANDLE ALLOCATION INPUTS
-  // --------------------------------
-
-  const handleAllocationChange = (e) => {
-
-    const { name, value } = e.target;
-
-    setAllocationForm(previous => ({
-      ...previous,
-      [name]: value
-    }));
-
-  };
-
-
-  // OPEN ALLOCATION FORM
-  const handleAddAllocation = () => {
-
-    setAllocationForm({
-      ...emptyAllocation,
-      resource_id: resources.length
-        ? String(resources[0].resource_id)
-        : "",
-      disaster_id: disasters.length
-        ? String(disasters[0].disaster_id)
-        : ""
-    });
-
-    setError("");
-    setNotice("");
-    setShowAllocationForm(true);
-
-  };
-
-
-  // --------------------------------
-  // CREATE ALLOCATION
-  // --------------------------------
-
-  const handleAllocationSubmit = async (e) => {
-
-    e.preventDefault();
-
-    try {
-
-      setSaving(true);
-      setError("");
-      setNotice("");
-
-      const payload = {
-        ...allocationForm,
-        resource_id: Number(allocationForm.resource_id),
-        disaster_id: Number(allocationForm.disaster_id),
-        quantity_allocated: Number(allocationForm.quantity_allocated)
-      };
-
-      const response = await fetch(
-        `${API}/allocations`,
+      const response = await apiRequest(
+        `/resources/${resource.resource_id}`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
+          method: "DELETE"
         }
       );
 
-      const result = await response.json();
+      setNotice(
+        response.message || "Resource deleted successfully."
+      );
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Allocation failed.");
-      }
-
-      setShowAllocationForm(false);
-      setAllocationForm(emptyAllocation);
-
-      setNotice(result.message);
-
-      await loadData();
+      await loadInventory(
+        selectedLocationId === "All"
+          ? null
+          : selectedLocationId
+      );
 
     } catch (err) {
 
-      setError(err.message);
+      setError(
+        err.message || "Unable to delete resource."
+      );
 
     } finally {
 
-      setSaving(false);
+      setDeletingId(null);
 
     }
 
   };
 
 
-  // --------------------------------
-  // UPDATE ALLOCATION STATUS
-  // --------------------------------
+  // -----------------------------------------
+  // SEARCH AND STOCK FILTER
+  // -----------------------------------------
 
-  const handleAllocationStatus = async (allocation, newStatus) => {
+  const filteredResources = locationScopedResources.filter(resource => {
 
-    try {
+    const searchText = search.toLowerCase().trim();
 
-      setError("");
-      setNotice("");
-
-      const response = await fetch(
-        `${API}/allocations/${allocation.allocation_id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            allocation_status: newStatus
-          })
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to update allocation.");
-      }
-
-      setNotice(result.message);
-
-      await loadData();
-
-    } catch (err) {
-
-      setError(err.message);
-
-    }
-
-  };
-
-
-  // --------------------------------
-  // DELETE PENDING ALLOCATION
-  // --------------------------------
-
-  const handleDeleteAllocation = async (id) => {
-
-    if (!window.confirm("Delete this pending allocation?")) return;
-
-    try {
-
-      const response = await fetch(
-        `${API}/allocations/${id}`,
-        { method: "DELETE" }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to delete allocation.");
-      }
-
-      setNotice(result.message);
-
-      await loadData();
-
-    } catch (err) {
-
-      setError(err.message);
-
-    }
-
-  };
-
-
-  // --------------------------------
-  // RESOURCE SEARCH AND FILTER
-  // --------------------------------
-
-  const filteredResources = resources.filter(resource => {
-
-    const text = search.toLowerCase();
-
-    const matchesSearch = [
+    const searchableValues = [
+      resource.resource_id,
       resource.resource_name,
       resource.category,
-      resource.location_name
-    ].some(value =>
-      String(value || "").toLowerCase().includes(text)
+      resource.location_name,
+      resource.district,
+      resource.state
+    ];
+
+    const matchesSearch = searchableValues.some(value =>
+
+      String(value || "")
+        .toLowerCase()
+        .includes(searchText)
+
     );
 
     const matchesStock =
@@ -462,9 +578,82 @@ function Resources() {
   });
 
 
-  // --------------------------------
-  // RESOURCE TABLE
-  // --------------------------------
+  // -----------------------------------------
+  // LOCATION-SPECIFIC STATISTICS
+  // -----------------------------------------
+
+  const totalItems = locationScopedResources.length;
+
+  const lowStock = locationScopedResources.filter(
+    resource => resource.stock_status === "low_stock"
+  ).length;
+
+  const outOfStock = locationScopedResources.filter(
+    resource => resource.stock_status === "out_of_stock"
+  ).length;
+
+  const availableItems = locationScopedResources.filter(
+    resource => resource.stock_status === "available"
+  ).length;
+
+  const totalCategories = new Set(
+    locationScopedResources.map(resource => resource.category)
+  ).size;
+
+
+  // -----------------------------------------
+  // SELECTED LOCATION DETAILS
+  // -----------------------------------------
+
+  const selectedLocation = isVolunteer
+    ? assignedLocation
+    : locations.find(
+        location =>
+          String(location.location_id) ===
+          String(selectedLocationId)
+      ) || null;
+
+
+  const locationViewReady =
+    !isCoordinator || Boolean(selectedLocationId);
+
+
+  // -----------------------------------------
+  // LOCATION SUMMARY TABLE
+  // -----------------------------------------
+
+  const overviewRows = locationScopedSummary.map(location => ({
+
+    locationId: location.location_id,
+    name: location.location_name,
+    district: location.district,
+    state: location.state,
+    totalItems: location.total_items,
+    lowStock: location.low_stock_items,
+    outOfStock: location.out_of_stock_items,
+    available: location.available_items,
+    categories: location.total_categories
+
+  }));
+
+
+  const overviewColumns = [
+
+    { key: "name", label: "Location" },
+    { key: "district", label: "District" },
+    { key: "state", label: "State" },
+    { key: "totalItems", label: "Resource Items" },
+    { key: "categories", label: "Categories" },
+    { key: "available", label: "Available" },
+    { key: "lowStock", label: "Low Stock" },
+    { key: "outOfStock", label: "Out of Stock" }
+
+  ];
+
+
+  // -----------------------------------------
+  // RESOURCE TABLE DATA
+  // -----------------------------------------
 
   const resourceRows = filteredResources.map(resource => ({
 
@@ -484,17 +673,35 @@ function Resources() {
 
     minimum: Number(resource.minimum_stock),
 
-    stock: resource.stock_status
+    stock: resource.stock_status,
+
+    original: resource
 
   }));
 
 
+  // -----------------------------------------
+  // RESOURCE TABLE COLUMNS
+  // -----------------------------------------
+
   const resourceColumns = [
 
     { key: "id", label: "Resource ID" },
+
     { key: "name", label: "Resource Name" },
+
     { key: "category", label: "Category" },
-    { key: "location", label: "Location" },
+
+    ...(
+      isVolunteer
+        ? []
+        : [
+            {
+              key: "location",
+              label: "Location"
+            }
+          ]
+    ),
 
     {
       key: "quantity",
@@ -512,188 +719,69 @@ function Resources() {
       key: "stock",
       label: "Stock Status",
       render: row => (
-        <StatusBadge
-          status={row.stock.replaceAll("_", " ")}
-        />
+        <StatusBadge status={row.stock.replaceAll("_", " ")} />
       )
     },
 
-    {
-      key: "actions",
-      label: "Actions",
-      render: row => (
+    ...(
+      canManage
+        ? [
+            {
+              key: "actions",
+              label: "Actions",
+              render: row => (
+                <div className="resource-actions">
 
-        <div className="resource-actions">
+                  <button
+                    type="button"
+                    className="resource-edit-button"
+                    onClick={() => handleEditResource(row.original)}
+                  >
+                    Edit
+                  </button>
 
-          <button
-            type="button"
-            className="resource-edit-button"
-            onClick={() => {
-              const selected = resources.find(
-                r => r.resource_id === row.resourceId
-              );
+                  <button
+                    type="button"
+                    className="resource-delete-button"
+                    onClick={() => handleDeleteResource(row.original)}
+                    disabled={deletingId === row.resourceId}
+                  >
+                    {deletingId === row.resourceId
+                      ? "Deleting..."
+                      : "Delete"}
+                  </button>
 
-              if (selected) handleEditResource(selected);
-            }}
-          >
-            Edit
-          </button>
-
-          <button
-            type="button"
-            className="resource-delete-button"
-            onClick={() => handleDeleteResource(row.resourceId)}
-          >
-            Delete
-          </button>
-
-        </div>
-      )
-    }
+                </div>
+              )
+            }
+          ]
+        : []
+    )
 
   ];
 
 
-  // --------------------------------
-  // ALLOCATION TABLE
-  // --------------------------------
-
-  const allocationRows = allocations.map(allocation => ({
-    allocationId: allocation.allocation_id,
-    id: `A${String(allocation.allocation_id).padStart(3, "0")}`,
-    resource: allocation.resource_name,
-    disaster: allocation.disaster_type,
-    location: allocation.location_name || "Unknown",
-    quantity: allocation.quantity_allocated,
-    unit: allocation.unit,
-    status: allocation.allocation_status,
-    original: allocation
-  }));
-
-
-  const nextStatus = {
-    pending: "approved",
-    approved: "dispatched",
-    dispatched: "delivered"
-  };
-
-  const nextStatusLabel = {
-    pending: "Approve",
-    approved: "Mark Dispatched",
-    dispatched: "Mark Delivered"
-  };
-
-
-  const allocationColumns = [
-
-    { key: "id", label: "Allocation ID" },
-    { key: "resource", label: "Resource" },
-    { key: "disaster", label: "Disaster" },
-    { key: "location", label: "Location" },
-
-    {
-      key: "quantity",
-      label: "Allocated Quantity",
-      render: row => `${row.quantity} ${row.unit}`
-    },
-
-    {
-      key: "status",
-      label: "Status",
-      render: row => (
-        <StatusBadge status={row.status} />
-      )
-    },
-
-    {
-      key: "actions",
-      label: "Actions",
-      render: row => (
-
-        <div className="resource-actions">
-
-          {nextStatus[row.status] && (
-
-            <button
-              type="button"
-              className="resource-edit-button"
-              onClick={() =>
-                handleAllocationStatus(
-                  row.original,
-                  nextStatus[row.status]
-                )
-              }
-            >
-              {nextStatusLabel[row.status]}
-            </button>
-
-          )}
-
-          {(row.status === "pending" || row.status === "approved") && (
-
-            <button
-              type="button"
-              className="resource-delete-button"
-              onClick={() =>
-                handleAllocationStatus(row.original, "cancelled")
-              }
-            >
-              Cancel
-            </button>
-
-          )}
-
-          {row.status === "pending" && (
-
-            <button
-              type="button"
-              className="resource-delete-button"
-              onClick={() => handleDeleteAllocation(row.allocationId)}
-            >
-              Delete
-            </button>
-
-          )}
-
-        </div>
-      )
-    }
-
-  ];
-
-
-  // --------------------------------
-  // STATISTICS
-  // --------------------------------
-
-  const lowStock = resources.filter(
-    r => Number(r.quantity_available) <= Number(r.minimum_stock)
-  ).length;
-
-  const pendingAllocations = allocations.filter(
-    a => a.allocation_status === "pending"
-  ).length;
-
-
-  // --------------------------------
-  // PAGE
-  // --------------------------------
+  // -----------------------------------------
+  // PAGE UI
+  // -----------------------------------------
 
   return (
 
-    <div className="module-page">
+    <div className="module-page resources-page">
 
       <PageHeader
         title="Resource Management"
-        description="Manage relief supplies, monitor stock and allocate resources to disasters."
+        description="Manage relief supplies and monitor inventory by location."
         action={
-          <button
-            type="button"
-            className="module-primary-button"
-            onClick={handleAddResource}
-          >
-            Add Resource
-          </button>
+          canManage && locationViewReady && locations.length > 0 && (
+            <button
+              type="button"
+              className="module-primary-button"
+              onClick={handleAddResource}
+            >
+              + Add Resource
+            </button>
+          )
         }
       />
 
@@ -707,363 +795,433 @@ function Resources() {
       )}
 
 
-      <StatGrid>
+      {/* VOLUNTEER LOCATION */}
 
-        <StatCard
-          label="Total Resource Items"
-          value={resources.length}
-        />
+      {isVolunteer && (
 
-        <StatCard
-          label="Low / Out of Stock"
-          value={lowStock}
-        />
+        <div className="resource-location-banner">
 
-        <StatCard
-          label="Allocation Requests"
-          value={allocations.length}
-        />
+          <div>
+            <span>Your Volunteer Location</span>
 
-        <StatCard
-          label="Pending Allocations"
-          value={pendingAllocations}
-        />
+            <h2>
+              {assignedLocation
+                ? assignedLocation.location_name
+                : "Location not assigned"}
+            </h2>
 
-      </StatGrid>
+            {assignedLocation && (
+              <p>
+                {[
+                  assignedLocation.district,
+                  assignedLocation.state
+                ].filter(Boolean).join(", ")}
+              </p>
+            )}
+          </div>
+
+          <span className="resource-scope-label">
+            Location-specific inventory
+          </span>
+
+        </div>
+
+      )}
 
 
-      {/* RESOURCE FORM */}
-      {showResourceForm && (
+      {/* LOCATION SELECTOR */}
 
-        <SectionCard
-          title={editingId ? "Edit Resource" : "Add New Resource"}
-        >
+      {!isVolunteer && (
 
-          <form
-            className="module-form resource-form"
-            onSubmit={handleResourceSubmit}
-          >
+        <SectionCard title="Select Inventory Location">
 
-            <label>
-              Resource Name
-              <input
-                name="resource_name"
-                value={resourceForm.resource_name}
-                onChange={handleResourceChange}
-                placeholder="Example: Drinking Water"
-                maxLength="120"
-                required
-              />
+          <div className="resource-location-filter">
+
+            <label htmlFor="resource-location-filter">
+              View inventory for
             </label>
 
+            <select
+              id="resource-location-filter"
+              value={selectedLocationId}
+              onChange={handleLocationSelect}
+            >
 
-            <label>
-              Category
-              <select
-                name="category"
-                value={resourceForm.category}
-                onChange={handleResourceChange}
-                required
-              >
-                <option value="Food">Food</option>
-                <option value="Water">Water</option>
-                <option value="Medicine">Medicine</option>
-                <option value="Clothing">Clothing</option>
-                <option value="Rescue Equipment">Rescue Equipment</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
+              {isCoordinator ? (
 
+                <option value="">
+                  Select the location you are monitoring
+                </option>
 
-            <label>
-              Location
-              <select
-                name="location_id"
-                value={resourceForm.location_id}
-                onChange={handleResourceChange}
-                required
-              >
-                <option value="">Select Location</option>
+              ) : (
 
-                {locations.map(location => (
+                <option value="All">
+                  All Locations
+                </option>
 
-                  <option
-                    key={location.location_id}
-                    value={location.location_id}
-                  >
-                    {location.location_name}, {location.district}
-                  </option>
+              )}
 
-                ))}
+              {locations.map(location => (
 
-              </select>
-            </label>
+                <option
+                  key={location.location_id}
+                  value={String(location.location_id)}
+                >
+                  {location.location_name}, {location.district}, {location.state}
+                </option>
 
+              ))}
 
-            <label>
-              Available Quantity
-              <input
-                type="number"
-                name="quantity_available"
-                value={resourceForm.quantity_available}
-                onChange={handleResourceChange}
-                min="0"
-                step="0.01"
-                required
-              />
-            </label>
+            </select>
 
+            {isCoordinator && (
+              <p>
+                Choose the area you are monitoring to view its inventory.
+              </p>
+            )}
 
-            <label>
-              Unit
-              <input
-                name="unit"
-                value={resourceForm.unit}
-                onChange={handleResourceChange}
-                placeholder="kg, litres, packets, units"
-                maxLength="30"
-                required
-              />
-            </label>
-
-
-            <label>
-              Minimum Stock Level
-              <input
-                type="number"
-                name="minimum_stock"
-                value={resourceForm.minimum_stock}
-                onChange={handleResourceChange}
-                min="0"
-                step="0.01"
-              />
-            </label>
-
-
-            <div className="full-width resource-form-actions">
-
-              <button
-                type="submit"
-                className="module-primary-button"
-                disabled={saving || locations.length === 0}
-              >
-                {saving
-                  ? "Saving..."
-                  : editingId
-                    ? "Update Resource"
-                    : "Save Resource"}
-              </button>
-
-              <button
-                type="button"
-                className="resource-cancel-button"
-                onClick={() => setShowResourceForm(false)}
-              >
-                Cancel
-              </button>
-
-            </div>
-
-          </form>
+          </div>
 
         </SectionCard>
 
       )}
 
 
-      {/* RESOURCE INVENTORY */}
-      <SectionCard title="Resource Inventory">
+      {/* LOADING */}
 
-        <SearchFilters>
+      {loading ? (
 
-          <input
-            type="text"
-            placeholder="Search resources, category or location"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-
-          <select
-            value={stockFilter}
-            onChange={e => setStockFilter(e.target.value)}
-          >
-            <option value="All">All Stock Levels</option>
-            <option value="available">Available</option>
-            <option value="low_stock">Low Stock</option>
-            <option value="out_of_stock">Out of Stock</option>
-          </select>
-
-        </SearchFilters>
-
-
-        {loading ? (
-          <p>Loading resources...</p>
-        ) : (
-          <DataTable
-            columns={resourceColumns}
-            data={resourceRows}
-            rowKey="resourceId"
-            emptyMessage="No resources found."
-          />
-        )}
-
-      </SectionCard>
-
-
-      {/* RESOURCE ALLOCATION */}
-      <SectionCard
-        title="Resource Allocation"
-      >
-
-        <div className="resource-allocation-heading">
-
-          <p>
-            Allocate available relief supplies to registered disasters.
+        <SectionCard title="Resource Inventory">
+          <p className="module-muted">
+            Loading resource information...
           </p>
+        </SectionCard>
 
-          <button
-            type="button"
-            className="module-primary-button"
-            onClick={handleAddAllocation}
-            disabled={!resources.length || !disasters.length}
-          >
-            Allocate Resource
-          </button>
+      ) : (
 
-        </div>
+        <>
 
+          {isVolunteer && !assignedLocation && (
 
-        {showAllocationForm && (
+            <div className="resource-empty-location">
 
-          <form
-            className="module-form resource-form"
-            onSubmit={handleAllocationSubmit}
-          >
+              <h3>Volunteer location not linked</h3>
 
-            <label>
-              Select Resource
-              <select
-                name="resource_id"
-                value={allocationForm.resource_id}
-                onChange={handleAllocationChange}
-                required
-              >
-
-                <option value="">Select Resource</option>
-
-                {resources.map(resource => (
-
-                  <option
-                    key={resource.resource_id}
-                    value={resource.resource_id}
-                  >
-                    {resource.resource_name} (
-                    {resource.quantity_available} {resource.unit})
-                  </option>
-
-                ))}
-
-              </select>
-            </label>
-
-
-            <label>
-              Select Disaster
-              <select
-                name="disaster_id"
-                value={allocationForm.disaster_id}
-                onChange={handleAllocationChange}
-                required
-              >
-
-                <option value="">Select Disaster</option>
-
-                {disasters.map(disaster => (
-
-                  <option
-                    key={disaster.disaster_id}
-                    value={disaster.disaster_id}
-                  >
-                    {disaster.disaster_type} - {disaster.location_name}
-                  </option>
-
-                ))}
-
-              </select>
-            </label>
-
-
-            <label>
-              Quantity to Allocate
-              <input
-                type="number"
-                name="quantity_allocated"
-                value={allocationForm.quantity_allocated}
-                onChange={handleAllocationChange}
-                min="0.01"
-                step="0.01"
-                required
-              />
-            </label>
-
-
-            <label>
-              Notes
-              <input
-                name="notes"
-                value={allocationForm.notes}
-                onChange={handleAllocationChange}
-                placeholder="Enter allocation notes"
-              />
-            </label>
-
-
-            <div className="full-width resource-form-actions">
-
-              <button
-                type="submit"
-                className="module-primary-button"
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Create Allocation"}
-              </button>
-
-              <button
-                type="button"
-                className="resource-cancel-button"
-                onClick={() => setShowAllocationForm(false)}
-              >
-                Cancel
-              </button>
+              <p>
+                Your volunteer profile is not connected to a registered
+                location. Please ask an administrator or coordinator
+                to update your volunteer profile.
+              </p>
 
             </div>
 
-          </form>
-
-        )}
+          )}
 
 
-        {allocations.length === 0 ? (
+          {isCoordinator && !selectedLocationId && (
 
-          <p>No allocation requests available.</p>
+            <div className="resource-empty-location">
 
-        ) : (
+              <h3>Select a location to monitor</h3>
 
-          <DataTable
-            columns={allocationColumns}
-            data={allocationRows}
-            rowKey="allocationId"
-            emptyMessage="No allocations found."
-          />
+              <p>
+                Choose a location from the dropdown above.
+                The inventory statistics and resource list will
+                update for that area.
+              </p>
 
-        )}
+            </div>
 
-      </SectionCard>
+          )}
+
+
+          {locationViewReady &&
+            (!isVolunteer || assignedLocation) && (
+
+            <>
+
+              {/* CURRENT LOCATION */}
+
+              <div className="resource-current-location">
+
+                <span>
+                  {selectedLocationId === "All"
+                    ? "Showing combined inventory"
+                    : "Currently monitoring"}
+                </span>
+
+                <strong>
+                  {selectedLocationId === "All"
+                    ? "All Locations"
+                    : selectedLocation?.location_name || "Selected Location"}
+                </strong>
+
+                {selectedLocation && (
+                  <small>
+                    {[
+                      selectedLocation.district,
+                      selectedLocation.state
+                    ].filter(Boolean).join(", ")}
+                  </small>
+                )}
+
+              </div>
+
+
+              {/* LOCATION-SPECIFIC STATISTICS */}
+
+              <StatGrid>
+
+                <StatCard
+                  label="Total Resource Items"
+                  value={formatNumber(totalItems)}
+                  note="In selected inventory"
+                />
+
+                <StatCard
+                  label="Available Items"
+                  value={formatNumber(availableItems)}
+                  note="Above minimum stock"
+                />
+
+                <StatCard
+                  label="Low Stock Items"
+                  value={formatNumber(lowStock)}
+                  note="At or below minimum stock"
+                />
+
+                <StatCard
+                  label="Out of Stock"
+                  value={formatNumber(outOfStock)}
+                  note={`${totalCategories} resource categories`}
+                />
+
+              </StatGrid>
+
+
+              {/* ADMIN LOCATION OVERVIEW */}
+
+              {isAdmin && selectedLocationId === "All" && (
+
+                <SectionCard title="Inventory Overview by Location">
+
+                  <p className="resource-section-description">
+                    Compare resource stock levels across registered
+                    locations. Select a location above to view its
+                    detailed inventory.
+                  </p>
+
+                  <DataTable
+                    columns={overviewColumns}
+                    data={overviewRows}
+                    rowKey="locationId"
+                    emptyMessage="No registered locations found."
+                  />
+
+                </SectionCard>
+
+              )}
+
+
+              {/* ADD / EDIT RESOURCE FORM */}
+
+              {showForm && canManage && (
+
+                <SectionCard
+                  title={
+                    editingId
+                      ? "Edit Resource"
+                      : "Add New Resource"
+                  }
+                >
+
+                  <form
+                    className="module-form resource-form"
+                    onSubmit={handleResourceSubmit}
+                  >
+
+                    <label>
+                      Resource Name *
+
+                      <input
+                        type="text"
+                        name="resource_name"
+                        value={resourceForm.resource_name}
+                        onChange={handleResourceChange}
+                        placeholder="Example: Drinking Water"
+                        maxLength="120"
+                        required
+                      />
+                    </label>
+
+
+                    <label>
+                      Category *
+
+                      <select
+                        name="category"
+                        value={resourceForm.category}
+                        onChange={handleResourceChange}
+                        required
+                      >
+                        {resourceCategories.map(category => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+
+                    <label>
+                      Location *
+
+                      <select
+                        name="location_id"
+                        value={resourceForm.location_id}
+                        onChange={handleResourceChange}
+                        required
+                      >
+                        <option value="">
+                          Select Location
+                        </option>
+
+                        {locations.map(location => (
+                          <option
+                            key={location.location_id}
+                            value={location.location_id}
+                          >
+                            {location.location_name}, {location.district}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+
+                    <label>
+                      Available Quantity *
+
+                      <input
+                        type="number"
+                        name="quantity_available"
+                        value={resourceForm.quantity_available}
+                        onChange={handleResourceChange}
+                        min="0"
+                        step="0.01"
+                        required
+                      />
+                    </label>
+
+
+                    <label>
+                      Unit *
+
+                      <input
+                        type="text"
+                        name="unit"
+                        value={resourceForm.unit}
+                        onChange={handleResourceChange}
+                        placeholder="kg, litres, packets, units"
+                        maxLength="30"
+                        required
+                      />
+                    </label>
+
+
+                    <label>
+                      Minimum Stock Level
+
+                      <input
+                        type="number"
+                        name="minimum_stock"
+                        value={resourceForm.minimum_stock}
+                        onChange={handleResourceChange}
+                        min="0"
+                        step="0.01"
+                      />
+                    </label>
+
+
+                    <div className="full-width resource-form-actions">
+
+                      <button
+                        type="submit"
+                        className="module-primary-button"
+                        disabled={saving}
+                      >
+                        {saving
+                          ? "Saving..."
+                          : editingId
+                            ? "Update Resource"
+                            : "Save Resource"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="resource-cancel-button"
+                        onClick={closeForm}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </button>
+
+                    </div>
+
+                  </form>
+
+                </SectionCard>
+
+              )}
+
+
+              {/* RESOURCE TABLE */}
+
+              <SectionCard title="Resource Inventory">
+
+                <SearchFilters>
+
+                  <input
+                    type="search"
+                    placeholder="Search resource or category..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+
+                  <select
+                    value={stockFilter}
+                    onChange={e => setStockFilter(e.target.value)}
+                  >
+                    <option value="All">All Stock Levels</option>
+                    <option value="available">Available</option>
+                    <option value="low_stock">Low Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+
+                </SearchFilters>
+
+
+                <DataTable
+                  columns={resourceColumns}
+                  data={resourceRows}
+                  rowKey="resourceId"
+                  emptyMessage="No resources found for this location."
+                />
+
+              </SectionCard>
+
+            </>
+
+          )}
+
+        </>
+
+      )}
 
     </div>
 
   );
 
 }
+
 
 export default Resources;

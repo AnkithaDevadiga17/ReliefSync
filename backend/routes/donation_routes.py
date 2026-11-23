@@ -2,12 +2,22 @@
 from decimal import Decimal, InvalidOperation
 
 import pymysql
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 from config.db import get_db_connection
 
 
 donation_bp = Blueprint("donations", __name__)
+
+MANAGER_ROLES = {"admin", "coordinator"}
+
+def manager_access_error():
+    if not session.get("user_id"):
+        return jsonify({"success": False, "message": "Please log in first."}), 401
+    if str(session.get("role", "")).strip().lower() not in MANAGER_ROLES:
+        return jsonify({"success": False, "message": "You do not have permission to manage donations."}), 403
+    return None
+
 
 
 # -----------------------------------
@@ -87,6 +97,10 @@ def get_donation_locations():
 @donation_bp.route("/donations", methods=["GET"])
 def get_donations():
 
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
+
     connection = None
 
     try:
@@ -101,6 +115,11 @@ def get_donations():
                     l.location_name,
                     d.donor_name,
                     d.donor_contact,
+                    d.donor_email,
+                    d.payment_method,
+                    d.transaction_reference,
+                    d.payment_proof,
+                    d.donation_source,
                     d.donation_type,
                     d.amount,
                     d.item_description,
@@ -162,6 +181,10 @@ def get_donations():
 
 @donation_bp.route("/donations", methods=["POST"])
 def add_donation():
+
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
 
     connection = None
 
@@ -332,6 +355,10 @@ def add_donation():
     methods=["PUT"]
 )
 def update_donation(donation_id):
+
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
 
     connection = None
 
@@ -541,6 +568,10 @@ def update_donation(donation_id):
 )
 def update_donation_status(donation_id):
 
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
+
     connection = None
 
     try:
@@ -627,6 +658,10 @@ def update_donation_status(donation_id):
 )
 def delete_donation(donation_id):
 
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
+
     connection = None
 
     try:
@@ -694,6 +729,10 @@ def delete_donation(donation_id):
 )
 def get_donation_distributions():
 
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
+
     connection = None
 
     try:
@@ -757,6 +796,10 @@ def get_donation_distributions():
     methods=["POST"]
 )
 def add_donation_distribution():
+
+    access_error = manager_access_error()
+    if access_error:
+        return access_error
 
     connection = None
 

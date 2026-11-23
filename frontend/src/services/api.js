@@ -1,23 +1,15 @@
 
 const API_BASE_URL = "http://localhost:5000/api";
-const API_ORIGIN = "http://localhost:5000";
 
-function normalizeApiUrl(url) {
-  return String(url).replace(
-    "http://127.0.0.1:5000",
-    API_ORIGIN
-  );
-}
-
-// Use this when you need the normal Fetch Response object.
-export function apiFetch(url, options = {}) {
-  return fetch(normalizeApiUrl(url), {
+// Send requests to the Flask backend and preserve login sessions.
+export async function apiFetch(url, options = {}) {
+  return fetch(url, {
     ...options,
-    credentials: "include"
+    credentials: "include",
   });
 }
 
-// Use this when you want parsed JSON and automatic error handling.
+// Common API request function.
 export async function apiRequest(endpoint, options = {}) {
   const url = endpoint.startsWith("http")
     ? endpoint
@@ -27,12 +19,11 @@ export async function apiRequest(endpoint, options = {}) {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...options.headers
-    }
+      ...options.headers,
+    },
   });
 
   const responseText = await response.text();
-
   let data = {};
 
   if (responseText) {
@@ -45,7 +36,7 @@ export async function apiRequest(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = new Error(
-      data.message || "Something went wrong."
+      data.message || `Request failed with status ${response.status}.`
     );
 
     error.status = response.status;
@@ -60,7 +51,7 @@ export async function apiRequest(endpoint, options = {}) {
 export function loginUser(email, password) {
   return apiRequest("/login", {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password }),
   });
 }
 
@@ -70,6 +61,6 @@ export function getCurrentSession() {
 
 export function logoutUser() {
   return apiRequest("/logout", {
-    method: "POST"
+    method: "POST",
   });
 }

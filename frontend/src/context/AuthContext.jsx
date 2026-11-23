@@ -1,84 +1,85 @@
-
 import {
   createContext,
   useContext,
   useEffect,
-  useState
+  useState,
 } from "react";
 
 import {
   loginUser,
   getCurrentSession,
-  logoutUser
+  logoutUser,
 } from "../services/api";
-
 
 const AuthContext = createContext(null);
 
-
 export function AuthProvider({ children }) {
-
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-
-  // Check existing login session when application loads
+  // Restore the login session once when the application starts.
   useEffect(() => {
+    let isMounted = true;
 
     async function checkUserSession() {
-
       try {
         const data = await getCurrentSession();
 
-        if (data.success && data.logged_in) {
+        if (isMounted && data.success && data.logged_in) {
           setUser(data.user);
+        } else if (isMounted) {
+          setUser(null);
         }
-
       } catch (error) {
         if (error.status !== 401) {
           console.error("Session check failed:", error);
         }
-
-        setUser(null);
-
+        if (isMounted) {
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     checkUserSession();
 
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-
-  // Login function
   async function login(email, password) {
-
     const data = await loginUser(email, password);
 
-    setUser(data.user);
+    if (!data.success || !data.user) {
+      throw new Error(data.message || "Login failed.");
+    }
 
+    setUser(data.user);
     return data;
   }
 
-
-  // Logout function
+  // The backend logout endpoint clears the Flask session cookie. Clear the
+  // React user state in finally so the sidebar disappears even if the
+  // request returns an error; the caller then redirects to the public home.
   async function logout() {
-
-    await logoutUser();
-
-    setUser(null);
+    try {
+      return await logoutUser();
+    } finally {
+      setUser(null);
+    }
   }
-
 
   const value = {
     user,
     loading,
     isAuthenticated: Boolean(user),
     login,
-    logout
+    logout,
   };
-
 
   return (
     <AuthContext.Provider value={value}>
@@ -87,16 +88,11 @@ export function AuthProvider({ children }) {
   );
 }
 
-
-// Custom hook
 export function useAuth() {
-
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error(
-      "useAuth must be used inside AuthProvider"
-    );
+    throw new Error("useAuth must be used inside AuthProvider");
   }
 
   return context;

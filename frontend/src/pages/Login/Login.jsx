@@ -19,7 +19,7 @@ function Login() {
 
     try {
       await login(email.trim(), password);
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err.message || "Login failed.");
     } finally {

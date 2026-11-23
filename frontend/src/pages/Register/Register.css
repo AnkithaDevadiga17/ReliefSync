@@ -1,0 +1,33 @@
+
+.donate-page { min-height:100vh; background:#f5f8fc; color:#172b4d; }
+.donate-nav { display:flex; justify-content:space-between; align-items:center; padding:18px clamp(20px,6vw,90px); background:#fff; border-bottom:1px solid #e5ebf2; }
+.donate-nav>a:last-child { color:#356b9f; text-decoration:none; font-weight:600; }
+.donate-wrap { max-width:850px; margin:0 auto; padding:42px 20px 70px; }
+.donate-intro { margin-bottom:25px; }
+.donate-intro h1 { font-size:38px; margin:8px 0; }
+.donate-intro p { color:#68778c; line-height:1.7; }
+.donate-form { display:grid; gap:17px; }
+.donate-panel { padding:24px; background:white; border:1px solid #e1e8f0; border-radius:13px; display:grid; gap:14px; }
+.donate-panel h2 { font-size:19px; margin:0 0 3px; }
+.donate-panel label,.registration-page label { display:grid; gap:7px; color:#42536b; font-size:13px; font-weight:700; }
+.donate-panel input,.donate-panel select,.registration-page input,.registration-page select,.registration-page textarea { width:100%; padding:11px 12px; border:1px solid #d5deea; border-radius:7px; font:inherit; color:#24364d; box-sizing:border-box; background:white; }
+.lookup-button { justify-self:start; background:none; border:0; padding:0; color:#2469a8; font-weight:700; cursor:pointer; }
+.lookup-message,.payment-note { color:#748196; font-size:12px; line-height:1.6; margin:0; }
+.payment-panel { text-align:center; }
+.payment-panel label { text-align:left; }
+.donate-qr { width:220px; height:220px; object-fit:contain; margin:4px auto; border:1px solid #e6ebf1; border-radius:8px; }
+.config-warning { padding:15px; background:#fff7e8; color:#8a6118; border-radius:8px; }
+.submit-donation { justify-self:start; font:inherit; }
+.form-error,.form-success { padding:12px 15px; border-radius:8px; }
+.form-error { color:#a52c2c; background:#fff0ef; }
+.form-success { color:#22653c; background:#eaf7ef; }
+.registration-page { max-width:680px; margin:0 auto; padding:30px 20px 60px; color:#24364d; }
+.registration-page header { margin-bottom:20px; }
+.registration-page header p,.registration-page section>p { color:#718096; }
+.registration-page section { background:#fff; padding:28px; border:1px solid #e1e8f0; border-radius:13px; box-shadow:0 10px 35px #172b4d0a; }
+.registration-page form { display:grid; gap:14px; margin:20px 0; }
+.registration-page .terms-label { display:flex; align-items:center; gap:9px; }
+.registration-page .terms-label input { width:auto; }
+.registration-page button[type=submit] { border:0; border-radius:8px; padding:13px 18px; color:white; background:#2366a9; font-weight:700; cursor:pointer; }
+.registration-page button:disabled { opacity:.6; cursor:wait; }
+.registration-page a { color:#2366a9; }

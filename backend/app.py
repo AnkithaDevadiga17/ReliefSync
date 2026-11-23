@@ -29,6 +29,7 @@ from routes.analytics_routes import analytics_bp
 from routes.auth_routes import auth_bp
 from routes.user_routes import user_bp
 from routes.location_routes import location_bp
+from routes.public_routes import public_bp
 
 
 class ReliefJSONProvider(DefaultJSONProvider):
@@ -93,7 +94,7 @@ app.config.update(
 
     SESSION_REFRESH_EACH_REQUEST=False,
 
-    MAX_CONTENT_LENGTH=1024 * 1024,
+    MAX_CONTENT_LENGTH=6 * 1024 * 1024,
 
     JSON_SORT_KEYS=False
 
@@ -226,6 +227,11 @@ app.register_blueprint(
 
 app.register_blueprint(
     location_bp,
+    url_prefix="/api"
+)
+
+app.register_blueprint(
+    public_bp,
     url_prefix="/api"
 )
 

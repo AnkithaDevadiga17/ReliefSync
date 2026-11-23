@@ -4,65 +4,62 @@
 }
 
 .sidebar {
-  width: 240px;
+  width: 250px;
+  min-width: 250px;
+  min-height: 100vh;
   background-color: #172b4d;
   color: white;
-  padding: 20px;
+  padding: 20px 15px;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
-.sidebar h2 {
-  margin-bottom: 5px;
+.sidebar h2 { margin-bottom: 5px; }
+.sidebar p { font-size: 12px; }
+.sidebar hr { margin: 20px 0; border-color: #ffffff30; }
+.sidebar nav { display: flex; flex-direction: column; gap: 7px; }
+.sidebar nav a,
+.sidebar-bottom a {
+  color: #fff;
+  text-decoration: none;
+  padding: 10px 11px;
+  border-radius: 7px;
+  font-size: 13px;
 }
-
-.sidebar p {
-  font-size: 12px;
-}
-
-.sidebar hr {
-  margin: 20px 0;
-}
-
-.sidebar nav {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.sidebar a {
-  color: white;
+.sidebar nav a:hover,
+.sidebar nav a.active,
+.sidebar-bottom a:hover {
+  background: #344b70;
   text-decoration: none;
 }
-
-.sidebar a.active {
-  font-weight: bold;
-  text-decoration: underline;
-}
-
 .sidebar-bottom {
   margin-top: auto;
+  padding-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-
+.sidebar-bottom button {
+  margin-top: 5px;
+  padding: 10px 12px;
+  border: 1px solid #ffffff70;
+  border-radius: 7px;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.sidebar-bottom button:hover { background: #344b70; }
 .main-content {
   flex: 1;
+  min-width: 0;
   padding: 30px;
   background-color: #f5f5f5;
 }
-
-.stats {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.stats div {
-  background-color: white;
-  padding: 20px;
-  min-width: 150px;
-  border: 1px solid #ddd;
-}
-
+.stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.stats div { background-color: white; padding: 20px; min-width: 150px; border: 1px solid #ddd; }
 .map-placeholder {
   height: 200px;
   background-color: #e5e5e5;
@@ -71,3 +68,4 @@
   justify-content: center;
   margin: 15px 0;
 }
+.auth-loading { min-height: 100vh; display: grid; place-items: center; color: #245f99; font-weight: 700; }

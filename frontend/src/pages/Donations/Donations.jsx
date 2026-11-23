@@ -578,6 +578,20 @@ function Donations() {
     },
 
     { key: "date", label: "Received Date" },
+    {
+      key: "paymentDetails",
+      label: "Payment Details",
+      render: row => row.original.donation_source === "public"
+        ? `${row.original.donor_email || "—"} · ${row.original.transaction_reference || "No reference"}`
+        : "Offline / coordinator entry"
+    },
+    {
+      key: "payment",
+      label: "Payment Proof",
+      render: row => row.original.payment_proof ? (
+        <a href={`http://localhost:5000/api/donations/${row.original.donation_id}/proof`} target="_blank" rel="noreferrer">View proof</a>
+      ) : (row.original.donation_source === "public" ? "Not uploaded" : "—")
+    },
 
     {
       key: "actions",

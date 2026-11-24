@@ -58,7 +58,7 @@ function AppLayout() {
   const protectedPage = (element) => <Protected>{element}</Protected>;
 
   return (
-    <div className={showSidebar ? "app-layout public-home-layout" : isStandalonePublicPage ? "public-shell" : "app-layout"}>
+    <div className={showSidebar ? "authenticated-shell" : isStandalonePublicPage ? "public-shell" : "app-layout"}>
       {showSidebar && <Sidebar />}
       <main className={isStandalonePublicPage ? "public-main" : showSidebar && path === "/" ? "public-main authenticated-public-main" : "main-content"}>
         <Routes>

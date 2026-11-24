@@ -1,9 +1,1 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: Arial, sans-serif;
-}
+*{margin:0;padding:0;box-sizing:border-box}html{scroll-behavior:smooth}body{font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.5;color:#183746;background:#f7f8f5}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:#0b3048}::selection{background:#d5e4dc;color:#0b3048}
